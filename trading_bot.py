@@ -338,7 +338,7 @@ class TradingBot:
 
                 self.logger.log(f"Current Position: {position_amt} | Active closing amount: {active_close_amount} | "
                                 f"Order quantity: {len(self.active_close_orders)}")
-                if len(self.active_close_orders) == self.config.quantity:
+                if len(self.active_close_orders) == self.config.max_orders:
                     await self.emergency_close_all()
                 self.last_log_time = time.time()
                 # Check for position mismatch
