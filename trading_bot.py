@@ -338,6 +338,8 @@ class TradingBot:
 
                 self.logger.log(f"Current Position: {position_amt} | Active closing amount: {active_close_amount} | "
                                 f"Order quantity: {len(self.active_close_orders)}")
+                if len(self.active_close_orders) == self.config.quantity:
+                    await self.emergency_close_all()
                 self.last_log_time = time.time()
                 # Check for position mismatch
                 if abs(position_amt - active_close_amount) > (2 * self.config.quantity):
@@ -349,13 +351,15 @@ class TradingBot:
                     error_message += f"current position: {position_amt} | active closing amount: {active_close_amount} | "f"Order quantity: {len(self.active_close_orders)}\n"
                     error_message += "###### ERROR ###### ERROR ###### ERROR ###### ERROR #####\n"
                     self.logger.log(error_message, "ERROR")
+                    await self.emergency_close_all()
+                    mismatch_detected = False
 
-                    await self._lark_bot_notify(error_message.lstrip())
-
-                    if not self.shutdown_requested:
-                        self.shutdown_requested = True
-
-                    mismatch_detected = True
+                    # await self._lark_bot_notify(error_message.lstrip())
+                    #
+                    # if not self.shutdown_requested:
+                    #     self.shutdown_requested = True
+                    #
+                    # mismatch_detected = True
                 else:
                     mismatch_detected = False
 
@@ -516,3 +520,99 @@ class TradingBot:
                 await self.exchange_client.disconnect()
             except Exception as e:
                 self.logger.log(f"Error disconnecting from exchange: {e}", "ERROR")
+
+    async def close_all_positions(self):
+        """平掉所有持仓"""
+        try:
+            # 获取当前持仓
+            position_amt = await self.exchange_client.get_account_positions()
+
+            if position_amt <= 0:
+                self.logger.log("当前无持仓，无需平仓", "INFO")
+                return True
+
+            self.logger.log(f"开始平仓，当前持仓: {position_amt}", "INFO")
+
+            # 获取市场价格
+            best_bid, best_ask = await self.exchange_client.fetch_bbo_prices(self.config.contract_id)
+
+            if best_bid <= 0 or best_ask <= 0:
+                self.logger.log("无法获取有效市场价格，平仓失败", "ERROR")
+                return False
+
+            # 确定平仓方向（假设是多头仓位，需要卖出平仓）
+            close_side = self.config.close_order_side  # 'sell' for long position
+
+            # 计算平仓价格（确保能快速成交）
+            if close_side == 'sell':
+                close_price = best_bid - self.config.tick_size  # 略低于买一价确保卖出成交
+            else:  # buy
+                close_price = best_ask + self.config.tick_size  # 略高于卖一价确保买入成交
+
+            # 下平仓单
+            close_order_result = await self.exchange_client.place_close_order(
+                self.config.contract_id,
+                position_amt,
+                close_price,
+                close_side
+            )
+
+            if close_order_result.success:
+                self.logger.log(f"全部平仓订单已提交: ID {close_order_result.order_id}, "
+                                f"方向 {close_side}, 数量 {position_amt}, 价格 {close_price}", "INFO")
+                return True
+            else:
+                self.logger.log(f"全部平仓订单提交失败: {close_order_result.error_message}", "ERROR")
+                return False
+
+        except Exception as e:
+            self.logger.log(f"全部平仓过程中出错: {e}", "ERROR")
+            self.logger.log(f"Traceback: {traceback.format_exc()}", "ERROR")
+            return False
+
+    async def cancel_all_orders(self):
+        """撤销所有订单"""
+        try:
+            # 撤销所有活动订单
+            active_orders = await self.exchange_client.get_active_orders(self.config.contract_id)
+
+            if not active_orders:
+                self.logger.log("当前无活动订单，无需撤销", "INFO")
+                return True
+
+            self.logger.log(f"开始撤销所有订单，订单数量: {len(active_orders)}", "INFO")
+
+            # 调用交易所客户端的撤销所有订单方法
+            result = await self.exchange_client._make_request('DELETE', '/fapi/v1/allOpenOrders', {
+                'symbol': self.config.contract_id
+            })
+
+            if isinstance(result, dict) and 'code' in result and result['code'] == 200:
+                self.logger.log("所有订单已成功撤销", "INFO")
+                return True
+            else:
+                self.logger.log(f"撤销所有订单失败: {result}", "ERROR")
+                return False
+
+        except Exception as e:
+            self.logger.log(f"撤销所有订单时出错: {e}", "ERROR")
+            return False
+
+    async def emergency_close_all(self):
+        """紧急全部平仓（撤销所有订单并平掉所有持仓）"""
+        try:
+            self.logger.log("执行紧急全部平仓操作", "WARNING")
+
+            # 1. 先撤销所有订单
+            await self.cancel_all_orders()
+
+            # 2. 再平掉所有持仓
+            await self.close_all_positions()
+
+            self.logger.log("紧急全部平仓操作完成", "WARNING")
+            return True
+
+        except Exception as e:
+            self.logger.log(f"紧急全部平仓操作失败: {e}", "ERROR")
+            return False
+

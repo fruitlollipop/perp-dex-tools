@@ -13,6 +13,9 @@ from typing import Dict, Any, List, Optional, Tuple
 from urllib.parse import urlencode
 import aiohttp
 import websockets
+from python_socks.async_ import ProxyChain
+from python_socks.async_.asyncio import Proxy
+from aiohttp_socks import ChainProxyConnector
 import sys
 
 from .base import BaseExchangeClient, OrderResult, OrderInfo, query_retry
@@ -63,7 +66,9 @@ class AsterWebSocketManager:
             'Content-Type': 'application/x-www-form-urlencoded'
         }
 
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(
+                connector=ChainProxyConnector.from_urls([os.getenv('local_proxy'), os.getenv('server_proxy')])
+        ) as session:
             async with session.post(
                 'https://fapi.asterdex.com/fapi/v1/listenKey',
                 headers=headers,
@@ -92,7 +97,9 @@ class AsterWebSocketManager:
                 'Content-Type': 'application/x-www-form-urlencoded'
             }
 
-            async with aiohttp.ClientSession() as session:
+            async with aiohttp.ClientSession(
+                    connector=ChainProxyConnector.from_urls([os.getenv('local_proxy'), os.getenv('server_proxy')])
+            ) as session:
                 async with session.put(
                     f"{self.base_url}/fapi/v1/listenKey",
                     headers=headers,
@@ -184,7 +191,11 @@ class AsterWebSocketManager:
 
             # Connect to WebSocket
             ws_url = f"{self.ws_url}/ws/{self.listen_key}"
-            self.websocket = await websockets.connect(ws_url)
+            sock = await ProxyChain([
+                Proxy.from_url(os.getenv('local_proxy')),
+                Proxy.from_url(os.getenv('server_proxy'))
+            ]).connect('fstream.asterdex.com', 443)
+            self.websocket = await websockets.connect(ws_url, sock=sock)
             self.running = True
 
             if self.logger:
@@ -382,7 +393,9 @@ class AsterClient(BaseExchangeClient):
             'Content-Type': 'application/x-www-form-urlencoded'
         }
 
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(
+                connector=ChainProxyConnector.from_urls([os.getenv('local_proxy'), os.getenv('server_proxy')])
+        ) as session:
             if method.upper() == 'GET':
                 # For GET requests, signature is based on query parameters only
                 signature = self._generate_signature(params)

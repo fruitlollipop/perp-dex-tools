@@ -20,3 +20,6 @@ git+https://github.com/your-quantguy/edgex-python-sdk.git@07425f7522be5845399264
 
 # Lighter exchange SDK
 git+https://github.com/elliottech/lighter-python.git@d0009799970aad54ebb940aa3dc90cbc00028c54
+
+python-socks==2.7.2
+aiohttp_socks==0.10.1
