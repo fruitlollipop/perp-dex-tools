@@ -16,7 +16,14 @@ BACKPACK_SECRET_KEY=your_api_secret
 # user icon -> "Wallet" -> "Ethereum Address" and "Copy Paradex Private key"
 PARADEX_L1_ADDRESS=your_generated_l1_address_here
 PARADEX_L2_PRIVATE_KEY=your_generated_l2_private_key_here
-PARADEX_ENVIRONMENT=prod # or testnet 
+PARADEX_ENVIRONMENT=prod # or testnet
+
+# GRVT Configuration
+# Get these from your GRVT account settings
+GRVT_TRADING_ACCOUNT_ID=your_trading_account_id_here
+GRVT_PRIVATE_KEY=your_private_key_here
+GRVT_API_KEY=your_api_key_here
+GRVT_ENVIRONMENT=prod # or testnet/staging/dev 
 
 # Aster Configuration
 ASTER_API_KEY=your_aster_api_key
@@ -27,9 +34,18 @@ API_KEY_PRIVATE_KEY=your_api_key_private_key_here
 LIGHTER_ACCOUNT_INDEX=0
 LIGHTER_API_KEY_INDEX=0
 
+# Extended Configuration
+EXTENDED_API_KEY=your_extended_api_key
+EXTENDED_STARK_KEY_PUBLIC=your_stark_public_key
+EXTENDED_STARK_KEY_PRIVATE=your_stark_private_key
+EXTENDED_VAULT=extended_vault_id
+
 # Notification (optional)
 # guide: https://www.feishu.cn/hc/zh-CN/articles/185289387886-%E6%B6%88%E6%81%AF%E5%8A%A9%E6%89%8B-%E6%9C%BA%E5%99%A8%E4%BA%BA
 LARK_TOKEN=
+
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_CHAT_ID=
 
 # Logging
 LOG_TO_CONSOLE=true

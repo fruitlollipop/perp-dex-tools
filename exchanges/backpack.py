@@ -13,7 +13,7 @@ from typing import Dict, Any, List, Optional, Tuple
 from cryptography.hazmat.primitives.asymmetric import ed25519
 import websockets
 from bpx.public import Public
-from bpx.account import Account
+from .bp_client import Account
 from bpx.constants.enums import OrderTypeEnum, TimeInForceEnum
 
 from .base import BaseExchangeClient, OrderResult, OrderInfo, query_retry
@@ -51,36 +51,37 @@ class BackpackWebSocketManager:
 
     async def connect(self):
         """Connect to Backpack WebSocket."""
-        try:
-            self.websocket = await websockets.connect(self.ws_url)
-            self.running = True
+        while True:
+            try:
+                self.logger.log(f"Connecting to Backpack WebSocket", "INFO")
+                self.websocket = await websockets.connect(self.ws_url)
+                self.running = True
 
-            # Subscribe to order updates for the specific symbol
-            timestamp = int(time.time() * 1000)
-            signature = self._generate_signature("subscribe", timestamp)
+                # Subscribe to order updates for the specific symbol
+                timestamp = int(time.time() * 1000)
+                signature = self._generate_signature("subscribe", timestamp)
 
-            subscribe_message = {
-                "method": "SUBSCRIBE",
-                "params": [f"account.orderUpdate.{self.symbol}"],
-                "signature": [
-                    self.public_key,
-                    signature,
-                    str(timestamp),
-                    "5000"
-                ]
-            }
+                subscribe_message = {
+                    "method": "SUBSCRIBE",
+                    "params": [f"account.orderUpdate.{self.symbol}"],
+                    "signature": [
+                        self.public_key,
+                        signature,
+                        str(timestamp),
+                        "5000"
+                    ]
+                }
 
-            await self.websocket.send(json.dumps(subscribe_message))
-            if self.logger:
-                self.logger.log(f"Subscribed to order updates for {self.symbol}", "INFO")
+                await self.websocket.send(json.dumps(subscribe_message))
+                if self.logger:
+                    self.logger.log(f"Subscribed to order updates for {self.symbol}", "INFO")
 
-            # Start listening for messages
-            await self._listen()
+                # Start listening for messages
+                await self._listen()
 
-        except Exception as e:
-            if self.logger:
-                self.logger.log(f"WebSocket connection error: {e}", "ERROR")
-            raise
+            except Exception as e:
+                if self.logger:
+                    self.logger.log(f"WebSocket connection error: {e}", "ERROR")
 
     async def _listen(self):
         """Listen for WebSocket messages."""
@@ -283,6 +284,21 @@ class BackpackClient(BaseExchangeClient):
         except Exception as e:
             self.logger.log(f"Error handling WebSocket order update: {e}", "ERROR")
 
+    async def get_order_price(self, direction: str) -> Decimal:
+        """Get the price of an order with Backpack using official SDK."""
+        best_bid, best_ask = await self.fetch_bbo_prices(self.config.contract_id)
+        if best_bid <= 0 or best_ask <= 0:
+            self.logger.log("Invalid bid/ask prices", "ERROR")
+            raise ValueError("Invalid bid/ask prices")
+
+        if direction == 'buy':
+            # For buy orders, place slightly below best ask to ensure execution
+            order_price = best_ask - self.config.tick_size
+        else:
+            # For sell orders, place slightly above best bid to ensure execution
+            order_price = best_bid + self.config.tick_size
+        return self.round_to_tick(order_price)
+
     @query_retry(default_return=(0, 0))
     async def fetch_bbo_prices(self, contract_id: str) -> Tuple[Decimal, Decimal]:
         # Get order book depth from Backpack
@@ -341,7 +357,7 @@ class BackpackClient(BaseExchangeClient):
 
             if 'code' in order_result:
                 message = order_result.get('message', 'Unknown error')
-                self.logger.log(f"[OPEN] Error placing order: {message}", "ERROR")
+                self.logger.log(f"[OPEN] Order rejected: {message}", "WARNING")
                 continue
 
             # Extract order ID from response
@@ -361,6 +377,41 @@ class BackpackClient(BaseExchangeClient):
             )
 
         return OrderResult(success=False, error_message='Max retries exceeded')
+
+    async def place_market_order(self, contract_id: str, quantity: Decimal, direction: str) -> OrderResult:
+        """Place a market order with Backpack."""
+        # Validate direction
+        if direction == 'buy':
+            side = 'Bid'
+        elif direction == 'sell':
+            side = 'Ask'
+        else:
+            raise Exception(f"[OPEN] Invalid direction: {direction}")
+
+        result = self.account_client.execute_order(
+            symbol=contract_id,
+            side=side,
+            order_type=OrderTypeEnum.MARKET,
+            quantity=str(quantity)
+        )
+
+        order_id = result.get('id')
+        order_status = result.get('status').upper()
+
+        if order_status != 'FILLED':
+            self.logger.log(f"Market order failed with status: {order_status}", "ERROR")
+            sys.exit(1)
+        # For market orders, we expect them to be filled immediately
+        else:
+            price = Decimal(result.get('executedQuoteQuantity', '0'))/Decimal(result.get('executedQuantity'))
+            return OrderResult(
+                success=True,
+                order_id=order_id,
+                side=direction.lower(),
+                size=quantity,
+                price=price,
+                status='FILLED'
+            )
 
     async def place_close_order(self, contract_id: str, quantity: Decimal, price: Decimal, side: str) -> OrderResult:
         """Place a close order with Backpack using official SDK with retry logic for POST_ONLY rejections."""

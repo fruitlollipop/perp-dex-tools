@@ -19,7 +19,8 @@ def query_retry(
     reraise: bool = False
 ):
     def retry_error_callback(retry_state: RetryCallState):
-        print(f"Operation: [{retry_state.fn.__name__}] failed after {retry_state.attempt_number} retries, exception: {str(retry_state.outcome.exception())}")
+        print(f"Operation: [{retry_state.fn.__name__}] failed after {retry_state.attempt_number} retries, "
+              f"exception: {str(retry_state.outcome.exception())}")
         return default_return
 
     return retry(
@@ -29,6 +30,7 @@ def query_retry(
         retry_error_callback=retry_error_callback,
         reraise=reraise
     )
+
 
 @dataclass
 class OrderResult:

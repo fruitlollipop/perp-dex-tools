@@ -56,6 +56,9 @@ class LighterClient(BaseExchangeClient):
         # Market configuration
         self.base_amount_multiplier = None
         self.price_multiplier = None
+        self.orders_cache = {}
+        self.current_order_client_id = None
+        self.current_order = None
 
     def _validate_config(self) -> None:
         """Validate Lighter configuration."""
@@ -170,38 +173,63 @@ class LighterClient(BaseExchangeClient):
         """Setup order update handler for WebSocket."""
         self._order_update_handler = handler
 
-    def _handle_websocket_order_update(self, order_data: Dict[str, Any]):
+    def _handle_websocket_order_update(self, order_data_list: List[Dict[str, Any]]):
         """Handle order updates from WebSocket."""
-        side = 'sell' if order_data['is_ask'] else 'buy'
-        if side == self.config.close_order_side:
-            order_type = "CLOSE"
-        else:
-            order_type = "OPEN"
+        for order_data in order_data_list:
+            if order_data['market_index'] != self.config.contract_id:
+                continue
 
-        order_id = order_data['order_index']
-        status = order_data['status'].upper()
-        filled_size = Decimal(order_data['filled_base_amount'])
-        size = Decimal(order_data['initial_base_amount'])
-        price = Decimal(order_data['price'])
-        remaining_size = Decimal(order_data['remaining_base_amount'])
+            side = 'sell' if order_data['is_ask'] else 'buy'
+            if side == self.config.close_order_side:
+                order_type = "CLOSE"
+            else:
+                order_type = "OPEN"
 
-        self.logger.log(f"[{order_type}] [{order_id}] {status} "
-                        f"{filled_size} @ {price}", "INFO")
-        if order_data['client_order_index'] == self.current_order_client_id:
-            current_order = OrderInfo(
-                order_id=order_id,
-                side=side,
-                size=size,
-                price=price,
-                status=status,
-                filled_size=filled_size,
-                remaining_size=remaining_size,
-                cancel_reason=''
-            )
-            self.current_order = current_order
+            order_id = order_data['order_index']
+            status = order_data['status'].upper()
+            filled_size = Decimal(order_data['filled_base_amount'])
+            size = Decimal(order_data['initial_base_amount'])
+            price = Decimal(order_data['price'])
+            remaining_size = Decimal(order_data['remaining_base_amount'])
 
-        if status in ['FILLED', 'CANCELED']:
-            self.logger.log_transaction(order_id, side, filled_size, price, status)
+            if order_id in self.orders_cache.keys():
+                if (self.orders_cache[order_id]['status'] == 'OPEN' and
+                        status == 'OPEN' and
+                        filled_size == self.orders_cache[order_id]['filled_size']):
+                    continue
+                elif status in ['FILLED', 'CANCELED']:
+                    del self.orders_cache[order_id]
+                else:
+                    self.orders_cache[order_id]['status'] = status
+                    self.orders_cache[order_id]['filled_size'] = filled_size
+            elif status == 'OPEN':
+                self.orders_cache[order_id] = {'status': status, 'filled_size': filled_size}
+
+            if status == 'OPEN' and filled_size > 0:
+                status = 'PARTIALLY_FILLED'
+
+            if status == 'OPEN':
+                self.logger.log(f"[{order_type}] [{order_id}] {status} "
+                                f"{size} @ {price}", "INFO")
+            else:
+                self.logger.log(f"[{order_type}] [{order_id}] {status} "
+                                f"{filled_size} @ {price}", "INFO")
+
+            if order_data['client_order_index'] == self.current_order_client_id or order_type == 'OPEN':
+                current_order = OrderInfo(
+                    order_id=order_id,
+                    side=side,
+                    size=size,
+                    price=price,
+                    status=status,
+                    filled_size=filled_size,
+                    remaining_size=remaining_size,
+                    cancel_reason=''
+                )
+                self.current_order = current_order
+
+            if status in ['FILLED', 'CANCELED']:
+                self.logger.log_transaction(order_id, side, filled_size, price, status)
 
     @query_retry(default_return=(0, 0))
     async def fetch_bbo_prices(self, contract_id: str) -> Tuple[Decimal, Decimal]:
@@ -279,14 +307,7 @@ class LighterClient(BaseExchangeClient):
 
         self.current_order = None
         self.current_order_client_id = None
-        # Get current market prices
-        best_bid, best_ask = await self.fetch_bbo_prices(contract_id)
-        if best_bid <= 0 or best_ask <= 0 or best_bid >= best_ask:
-            self.logger.log("Invalid bid/ask prices", "ERROR")
-            await asyncio.sleep(5)
-            return OrderResult(success=False, error_message='Invalid bid/ask prices')
-
-        order_price = (best_bid + best_ask) / 2
+        order_price = await self.get_order_price(direction)
 
         order_price = self.round_to_tick(order_price)
         order_result = await self.place_limit_order(contract_id, quantity, order_price, direction)
@@ -302,34 +323,14 @@ class LighterClient(BaseExchangeClient):
             if self.current_order is not None:
                 order_status = self.current_order.status
 
-        if self.current_order.status != 'FILLED':
-            order_result = await self.cancel_order(self.current_order.order_id)
-            start_time = time.time()
-            while (time.time() - start_time < 10 and self.current_order.status != 'CANCELED' and
-                   self.current_order.status != 'FILLED'):
-                await asyncio.sleep(0.1)
-
-            if self.current_order.status not in ['CANCELED', 'FILLED']:
-                raise Exception(f"[OPEN] Error cancelling order: {self.current_order.status}")
-
-        if self.current_order.status == 'FILLED':
-            return OrderResult(
-                success=True,
-                order_id=self.current_order.order_id,
-                side=direction,
-                size=quantity,
-                price=order_price,
-                status=self.current_order.status
-            )
-        else:
-            return OrderResult(
-                success=False,
-                order_id=self.current_order.order_id,
-                side=direction,
-                size=quantity,
-                price=order_price,
-                status=self.current_order.status
-            )
+        return OrderResult(
+            success=True,
+            order_id=self.current_order.order_id,
+            side=direction,
+            size=quantity,
+            price=order_price,
+            status=self.current_order.status
+        )
 
     async def _get_active_close_orders(self, contract_id: str) -> int:
         """Get active close orders for a contract using official SDK."""
@@ -345,6 +346,9 @@ class LighterClient(BaseExchangeClient):
         self.current_order = None
         self.current_order_client_id = None
         order_result = await self.place_limit_order(contract_id, quantity, price, side)
+
+        # wait for 5 seconds to ensure order is placed
+        await asyncio.sleep(5)
         if order_result.success:
             return OrderResult(
                 success=True,
@@ -356,6 +360,26 @@ class LighterClient(BaseExchangeClient):
             )
         else:
             raise Exception(f"[CLOSE] Error placing order: {order_result.error_message}")
+    
+    async def get_order_price(self, side: str = '') -> Decimal:
+        """Get the price of an order with Lighter using official SDK."""
+        # Get current market prices
+        best_bid, best_ask = await self.fetch_bbo_prices(self.config.contract_id)
+        if best_bid <= 0 or best_ask <= 0 or best_bid >= best_ask:
+            self.logger.log("Invalid bid/ask prices", "ERROR")
+            raise ValueError("Invalid bid/ask prices")
+
+        order_price = (best_bid + best_ask) / 2
+
+        active_orders = await self.get_active_orders(self.config.contract_id)
+        close_orders = [order for order in active_orders if order.side == self.config.close_order_side]
+        for order in close_orders:
+            if side == 'buy':
+                order_price = min(order_price, order.price - self.config.tick_size)
+            else:
+                order_price = max(order_price, order.price + self.config.tick_size)
+
+        return order_price
 
     async def cancel_order(self, order_id: str) -> OrderResult:
         """Cancel an order with Lighter."""

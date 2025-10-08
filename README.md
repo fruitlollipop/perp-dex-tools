@@ -4,29 +4,48 @@
 
 **English speakers**: Please read README_EN.md for the English version of this documentation.
 
+## 📢 分享说明
+
+**欢迎分享本项目！** 如果您要分享或修改此代码，请务必包含对原始仓库的引用。我们鼓励开源社区的发展，但请保持对原作者工作的尊重和认可。
+
+---
+
 ## 自动交易机器人
 
-一个支持多个交易所（目前包括 EdgeX, Backpack, Paradex, Aster, Lighter）的模块化交易机器人。该机器人实现了自动下单并在盈利时自动平仓的策略，主要目的是取得高交易量。
+一个支持多个交易所（目前包括 EdgeX, Backpack, Paradex, Aster, Lighter, grvt, Extended）的模块化交易机器人。该机器人实现了自动下单并在盈利时自动平仓的策略，主要目的是取得高交易量。
 
 ## 邀请链接 (获得返佣以及福利)
 
-#### EdgeX 交易所: [https://pro.edgex.exchange/referral/QUANT](https://pro.edgex.exchange/referral/QUANT)
+#### EdgeX: [https://pro.edgex.exchange/referral/QUANT](https://pro.edgex.exchange/referral/QUANT)
 
 永久享受 VIP 1 费率；额外 10% 手续费返佣；10% 额外奖励积分
 
-#### Backpack 交易所: [https://backpack.exchange/join/quant](https://backpack.exchange/join/quant)
+#### Backpack: [https://backpack.exchange/join/quant](https://backpack.exchange/join/quant)
 
 使用我的推荐链接获得 35% 手续费返佣
 
-#### Paradex 交易所: [https://app.paradex.trade/r/quant](https://app.paradex.trade/r/quant)
+#### Paradex: [https://app.paradex.trade/r/quant](https://app.paradex.trade/r/quant)
 
 使用我的推荐链接获得 10% 手续费返佣以及潜在未来福利
 
-#### Aster 交易所: [https://www.asterdex.com/zh-CN/referral/5191B1](https://www.asterdex.com/zh-CN/referral/5191B1)
+#### Aster: [https://www.asterdex.com/zh-CN/referral/5191B1](https://www.asterdex.com/zh-CN/referral/5191B1)
 
 使用我的推荐链接获得 30% 手续费返佣以及积分加成
 
+#### grvt: [https://grvt.io/exchange/sign-up?ref=QUANT](https://grvt.io/exchange/sign-up?ref=QUANT)
+
+获得 1.3x 全网最高的积分加成，未来的手续费返佣（官方预计 10 月中上线），以及即将开始的专属交易竞赛
+
+#### Extended: [https://app.extended.exchange/join/QUANT](https://app.extended.exchange/join/QUANT)
+10%的即时手续费减免；积分加成（官方未公布具体加成公式，但文档里有明确说明，通过官方大使邀请能拿到比自己小号邀请自己更多的分数）；参与社群的专属交易量大赛，奖池高达$70000，10月15日结束
+
 ## 安装
+
+Python 版本要求（最佳选项是 Python 3.10 - 3.12）：
+
+- grvt 要求 python 版本在 3.10 及以上
+- Paradex 要求 python 版本在 3.9 - 3.12
+- 其他交易所需要 python 版本在 3.8 及以上
 
 1. **克隆仓库**：
 
@@ -38,6 +57,7 @@
 2. **创建并激活虚拟环境**：
 
    首先确保你目前不在任何虚拟环境中：
+
    ```bash
    deactivate
    ```
@@ -49,17 +69,20 @@
    ```
 
    激活虚拟环境（每次使用脚本时，都需要激活虚拟环境）：
+
    ```bash
    source env/bin/activate  # Windows: env\Scripts\activate
    ```
 
 3. **安装依赖**：
    首先确保你目前不在任何虚拟环境中：
+
    ```bash
    deactivate
    ```
 
    激活虚拟环境（每次使用脚本时，都需要激活虚拟环境）：
+
    ```bash
    source env/bin/activate  # Windows: env\Scripts\activate
    ```
@@ -68,9 +91,21 @@
    pip install -r requirements.txt
    ```
 
+   **grvt 用户**：如果您想使用 grvt 交易所，需要额外安装 grvt 专用依赖：
+   激活虚拟环境（每次使用脚本时，都需要激活虚拟环境）：
+
+   ```bash
+   source env/bin/activate  # Windows: env\Scripts\activate
+   ```
+
+   ```bash
+   pip install grvt-pysdk
+   ```
+
    **Paradex 用户**：如果您想使用 Paradex 交易所，需要额外创建一个虚拟环境并安装 Paradex 专用依赖：
 
    首先确保你目前不在任何虚拟环境中：
+
    ```bash
    deactivate
    ```
@@ -82,17 +117,22 @@
    ```
 
    激活虚拟环境（每次使用脚本时，都需要激活虚拟环境）：
+
    ```bash
    source para_env/bin/activate  # Windows: para_env\Scripts\activate
    ```
 
    安装 Paradex 依赖
+
    ```bash
    pip install -r para_requirements.txt
    ```
 
 4. **设置环境变量**：
    在项目根目录创建`.env`文件，并使用 env_example.txt 作为样本，修改为你的 api 密匙。
+
+5. **Telegram 机器人设置（可选）**：
+   如需接收交易通知，请参考 [Telegram 机器人设置指南](docs/telegram-bot-setup.md) 配置 Telegram 机器人。
 
 ## 策略概述
 
@@ -112,6 +152,7 @@
 #### ⚙️ 关键参数
 
 - **quantity**: 每笔订单的交易数量
+- **direction**: 脚本交易的方向，buy 表示看多，sell 表示看空
 - **take-profit**: 止盈百分比（如 0.02 表示 0.02%）
 - **max-orders**: 最大同时活跃订单数（风险控制）
 - **wait-time**: 订单间等待时间（避免过于频繁交易）
@@ -193,6 +234,12 @@ ETH 永续合约（带网格步长控制）：
 python runbot.py --exchange backpack --ticker ETH --quantity 0.1 --take-profit 0.02 --max-orders 40 --wait-time 450 --grid-step 0.3
 ```
 
+ETH 永续合约（启用 Boost 模式）：
+
+```bash
+python runbot.py --exchange backpack --ticker ETH --direction buy --quantity 0.1 --boost
+```
+
 ### Aster 交易所：
 
 ETH：
@@ -204,7 +251,23 @@ python runbot.py --exchange aster --ticker ETH --quantity 0.1 --take-profit 0.02
 ETH（启用 Boost 模式）：
 
 ```bash
-python runbot.py --exchange aster --ticker ETH --direction buy --quantity 0.1 --aster-boost
+python runbot.py --exchange aster --ticker ETH --direction buy --quantity 0.1 --boost
+```
+
+### GRVT 交易所：
+
+BTC：
+
+```bash
+python runbot.py --exchange grvt --ticker BTC --quantity 0.05 --take-profit 0.02 --max-orders 40 --wait-time 450
+```
+
+### Extended 交易所：
+
+ETH：
+
+```bash
+python runbot.py --exchange extended --ticker ETH --quantity 0.1 --take-profit 0 --max-orders 40 --wait-time 450 --grid-step 0.1
 ```
 
 ## 配置
@@ -214,6 +277,11 @@ python runbot.py --exchange aster --ticker ETH --direction buy --quantity 0.1 --
 #### 通用配置
 
 - `ACCOUNT_NAME`: 环境变量中当前账号的名称，用于多账号日志区分，可自定义，非必须
+
+#### Telegram 配置（可选）
+
+- `TELEGRAM_BOT_TOKEN`: Telegram 机器人令牌
+- `TELEGRAM_CHAT_ID`: Telegram 对话 ID
 
 #### EdgeX 配置
 
@@ -243,9 +311,23 @@ python runbot.py --exchange aster --ticker ETH --direction buy --quantity 0.1 --
 - `LIGHTER_ACCOUNT_INDEX`: Lighter 账户索引
 - `LIGHTER_API_KEY_INDEX`: Lighter API 密钥索引
 
+#### GRVT 配置
+
+- `GRVT_TRADING_ACCOUNT_ID`: 您的 GRVT 交易账户 ID
+- `GRVT_PRIVATE_KEY`: 您的 GRVT 私钥
+- `GRVT_API_KEY`: 您的 GRVT API 密钥
+
+#### Extended 配置
+
+- `EXTENDED_API_KEY`: Extended API Key
+- `EXTENDED_STARK_KEY_PUBLIC`: 创建API后显示的 Stark 公钥
+- `EXTENDED_STARK_KEY_PRIVATE`: 创建API后显示的 Stark 私钥
+- `EXTENDED_VAULT`: 创建API后显示的 Extended Vault ID
+
 **获取 LIGHTER_ACCOUNT_INDEX 的方法**：
 
 1. 在下面的网址最后加上你的钱包地址：
+
    ```
    https://mainnet.zklighter.elliot.ai/api/v1/account?by=l1_address&value=
    ```
@@ -256,7 +338,7 @@ python runbot.py --exchange aster --ticker ETH --direction buy --quantity 0.1 --
 
 ### 命令行参数
 
-- `--exchange`: 使用的交易所：'edgex'、'backpack'、'paradex'、'aster'或'lighter'（默认：edgex）
+- `--exchange`: 使用的交易所：'edgex'、'backpack'、'paradex'、'aster'、'lighter'、'grvt' 或 'extended'（默认：edgex）
 - `--ticker`: 标的资产符号（例如：ETH、BTC、SOL）。合约 ID 自动解析。
 - `--quantity`: 订单数量（默认：0.1）
 - `--take-profit`: 止盈百分比（例如 0.02 表示 0.02%）
@@ -265,10 +347,10 @@ python runbot.py --exchange aster --ticker ETH --direction buy --quantity 0.1 --
 - `--max-orders`: 最大活跃订单数（默认：40）
 - `--wait-time`: 订单间等待时间（秒）（默认：450）
 - `--grid-step`: 与下一个平仓订单价格的最小距离百分比（默认：-100，表示无限制）
-- `--stop-price`: 当 `direction` 是 'buy' 时，price >= stop-price 停止交易并退出程序；'sell' 逻辑相反（默认：-1，表示不会因为价格原因停止交易）
-- `--pause-price`: 当 `direction` 是 'buy' 时，price >= pause-price 停止交易并退出程序；'sell' 逻辑相反（默认：-1，表示不会因为价格原因停止交易）
-- `--aster-boost`: 启用 Aster 交易所的 Boost 模式进行交易量提升（仅适用于 aster 交易所）
-  `--aster-boost` 的下单逻辑：下 maker 单开仓，成交后立即用 taker 单关仓，以此循环。磨损为一单 maker，一单 taker 的手续费，以及滑点。
+- `--stop-price`: 当 `direction` 是 'buy' 时，当 price >= stop-price 时停止交易并退出程序；'sell' 逻辑相反（默认：-1，表示不会因为价格原因停止交易），参数的目的是防止订单被挂在”你认为的开多高点或开空低点“。
+- `--pause-price`: 当 `direction` 是 'buy' 时，当 price >= pause-price 时暂停交易，并在价格回到 pause-price 以下时重新开始交易；'sell' 逻辑相反（默认：-1，表示不会因为价格原因停止交易），参数的目的是防止订单被挂在”你认为的开多高点或开空低点“。
+- `--boost`: 启用 Boost 模式进行交易量提升（仅适用于 aster 和 backpack 交易所）
+  Boost 模式的下单逻辑：下 maker 单开仓，成交后立即用 taker 单关仓，以此循环。磨损为一单 maker，一单 taker 的手续费，以及滑点。
 
 ## 日志记录
 

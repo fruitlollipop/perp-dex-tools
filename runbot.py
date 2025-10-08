@@ -47,7 +47,7 @@ def parse_arguments():
     parser.add_argument('--pause-price', type=Decimal, default=-1,
                         help='Pause trading and wait. Buy: pause if price >= pause-price.'
                         'Sell: pause if price <= pause-price. (default: -1, no pause)')
-    parser.add_argument('--aster-boost', action='store_true',
+    parser.add_argument('--boost', action='store_true',
                         help='Use the Boost mode for volume boosting')
 
     return parser.parse_args()
@@ -74,7 +74,7 @@ def setup_logging(log_level: str):
     # Suppress other noisy loggers
     logging.getLogger('urllib3').setLevel(logging.WARNING)
     logging.getLogger('requests').setLevel(logging.WARNING)
-    
+
     # Suppress Lighter SDK debug logs
     logging.getLogger('lighter').setLevel(logging.WARNING)
     # Also suppress any root logger DEBUG messages that might be coming from Lighter
@@ -90,9 +90,9 @@ async def main():
     # Setup logging first
     setup_logging("WARNING")
 
-    # Validate aster-boost can only be used with aster exchange
-    if args.aster_boost and args.exchange != 'aster':
-        print(f"Error: --aster-boost can only be used when --exchange is 'aster'. "
+    # Validate boost-mode can only be used with aster and backpack exchange
+    if args.boost and args.exchange.lower() != 'aster' and args.exchange.lower() != 'backpack':
+        print(f"Error: --boost can only be used when --exchange is 'aster' or 'backpack'. "
               f"Current exchange: {args.exchange}")
         sys.exit(1)
 
@@ -104,19 +104,19 @@ async def main():
 
     # Create configuration
     config = TradingConfig(
-        ticker=args.ticker,
+        ticker=args.ticker.upper(),
         contract_id='',  # will be set in the bot's run method
         tick_size=Decimal(0),
         quantity=args.quantity,
         take_profit=args.take_profit,
-        direction=args.direction,
+        direction=args.direction.lower(),
         max_orders=args.max_orders,
         wait_time=args.wait_time,
-        exchange=args.exchange,
+        exchange=args.exchange.lower(),
         grid_step=Decimal(args.grid_step),
         stop_price=Decimal(args.stop_price),
         pause_price=Decimal(args.pause_price),
-        aster_boost=args.aster_boost
+        boost_mode=args.boost
     )
 
     # Create and run the bot

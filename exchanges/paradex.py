@@ -186,6 +186,8 @@ class ParadexClient(BaseExchangeClient):
                 price = data.get("price")
                 contract_id = data.get("market")
                 filled_size = str(Decimal(size) - Decimal(remaining_size))
+                if contract_id != self.config.contract_id:
+                    return
 
                 if order_id and status:
                     # Determine order type based on side
@@ -281,6 +283,29 @@ class ParadexClient(BaseExchangeClient):
 
         return best_bid, best_ask
 
+    async def get_order_price(self, direction: str) -> Decimal:
+        """Get the price of an order with Paradex using official SDK."""
+        # Get current market prices
+        best_bid, best_ask = await self.fetch_bbo_prices(self.config.contract_id)
+
+        # Determine order side and price
+        from paradex_py.common.order import OrderSide
+
+        if direction == 'buy':
+            # For buy orders, place slightly below best ask to ensure execution
+            order_price = best_ask - self.config.tick_size
+            order_side = OrderSide.Buy
+        elif direction == 'sell':
+            # For sell orders, place slightly above best bid to ensure execution
+            order_price = best_bid + self.config.tick_size
+            order_side = OrderSide.Sell
+        else:
+            raise Exception(f"[OPEN] Invalid direction: {direction}")
+
+        order_price = self.round_to_tick(order_price)
+        return order_price
+
+
     @retry(
         stop=stop_after_attempt(5),
         wait=wait_fixed(3),
@@ -336,6 +361,7 @@ class ParadexClient(BaseExchangeClient):
     async def place_open_order(self, contract_id: str, quantity: Decimal, direction: str) -> OrderResult:
         """Place an open order with Paradex using official SDK."""
         attempt = 0
+        from paradex_py.common.order import OrderSide
         while True:
             attempt += 1
             if attempt % 5 == 0:
@@ -349,24 +375,14 @@ class ParadexClient(BaseExchangeClient):
                     self.logger.log(f"[OPEN] ERROR: Active open orders abnormal: {active_open_orders}", "ERROR")
                     raise Exception(f"[OPEN] ERROR: Active open orders abnormal: {active_open_orders}")
 
-            # Get current market prices
-            best_bid, best_ask = await self.fetch_bbo_prices(contract_id)
-
-            # Determine order side and price
-            from paradex_py.common.order import OrderSide
-
             if direction == 'buy':
-                # For buy orders, place slightly below best ask to ensure execution
-                order_price = best_ask - self.config.tick_size
                 order_side = OrderSide.Buy
             elif direction == 'sell':
-                # For sell orders, place slightly above best bid to ensure execution
-                order_price = best_bid + self.config.tick_size
                 order_side = OrderSide.Sell
             else:
                 raise Exception(f"[OPEN] Invalid direction: {direction}")
 
-            order_price = self.round_to_tick(order_price)
+            order_price = await self.get_order_price(direction)
             order_result = await self.place_post_only_order(contract_id, quantity, order_price, order_side)
             order_status = order_result.status
             order_id = order_result.order_id

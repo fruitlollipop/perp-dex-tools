@@ -1,8 +1,14 @@
 ##### Follow Me - **X (Twitter)**: [@yourQuantGuy](https://x.com/yourQuantGuy)
 
+## 📢 Sharing Notice
+
+**Sharing is encouraged!** If you share or modify this code, please include attribution to the original repository. We encourage the growth of the open-source community, but please maintain respect and recognition for the original author's work.
+
+---
+
 ## Multi-Exchange Trading Bot
 
-A modular trading bot that supports multiple exchanges including EdgeX, Backpack, Paradex, Aster, and Lighter. The bot implements an automated strategy that places orders and automatically closes them at a profit.
+A modular trading bot that supports multiple exchanges including EdgeX, Backpack, Paradex, Aster, Lighter, GRVT, and Extended. The bot implements an automated strategy that places orders and automatically closes them at a profit.
 
 ## Referral Links (Enjoy fee rebates and benefits)
 
@@ -10,17 +16,24 @@ A modular trading bot that supports multiple exchanges including EdgeX, Backpack
 
 Instant VIP 1 Trading Fees; 10% Fee Rebate; 10% Bonus Points
 
-#### Backpack Exchange: [https://backpack.exchange/join/quant](https://backpack.exchange/join/quant)
+#### Backpack: [https://backpack.exchange/join/quant](https://backpack.exchange/join/quant)
 
 You will get 35% fee rebates on all your trading fees
 
-#### Paradex Exchange: [https://app.paradex.trade/r/quant](https://app.paradex.trade/r/quant)
+#### Paradex: [https://app.paradex.trade/r/quant](https://app.paradex.trade/r/quant)
 
 You will get 10% taker fee discount rebates and potential future benefits
 
-#### Aster Exchange: [https://www.asterdex.com/zh-CN/referral/5191B1](https://www.asterdex.com/zh-CN/referral/5191B1)
+#### Aster: [https://www.asterdex.com/zh-CN/referral/5191B1](https://www.asterdex.com/zh-CN/referral/5191B1)
 
 You will get 30% fee rebates and points boost
+
+#### grvt: [https://grvt.io/exchange/sign-up?ref=QUANT](https://grvt.io/exchange/sign-up?ref=QUANT)
+You will get 1.3x points boost; rebates (auto rebates system is expected to be launched in mid-Oct); access to private trading competition
+
+#### Extended: [https://app.extended.exchange/join/QUANT](https://app.extended.exchange/join/QUANT)
+10% fee discount; points boost (black box, but "you will get more points from affiliate referral program than using another account to refer yourself" quoted from the official documentation from Extended); access to private trading competition
+
 
 ## Installation
 
@@ -34,6 +47,7 @@ You will get 30% fee rebates and points boost
 2. **Create and activate virtual environment**:
 
    First, make sure you are not currently in any virtual environment:
+
    ```bash
    deactivate
    ```
@@ -45,11 +59,23 @@ You will get 30% fee rebates and points boost
    ```
 
    Activate virtual environment (you need to activate the virtual environment every time you use the script):
+
    ```bash
    source env/bin/activate  # Windows: env\Scripts\activate
    ```
 
 3. **Install dependencies**:
+   First, make sure you are not currently in any virtual environment:
+
+   ```bash
+   deactivate
+   ```
+
+   Activate virtual environment (you need to activate the virtual environment every time you use the script):
+
+   ```bash
+   source env/bin/activate  # Windows: env\Scripts\activate
+   ```
 
    ```bash
    pip install -r requirements.txt
@@ -58,6 +84,7 @@ You will get 30% fee rebates and points boost
    **Paradex Users**: If you want to use Paradex exchange, you need to create an additional virtual environment and install Paradex-specific dependencies:
 
    First, make sure you are not currently in any virtual environment:
+
    ```bash
    deactivate
    ```
@@ -69,17 +96,22 @@ You will get 30% fee rebates and points boost
    ```
 
    Activate virtual environment (you need to activate the virtual environment every time you use the script):
+
    ```bash
    source para_env/bin/activate  # Windows: para_env\Scripts\activate
    ```
 
    Install Paradex dependencies
+
    ```bash
    pip install -r para_requirements.txt
    ```
 
 4. **Set up environment variables**:
    Create a `.env` file in the project root directory and use env_example.txt as a template to modify with your API keys.
+
+5. **Telegram Bot Setup (Optional)**:
+   To receive trading notifications, please refer to the [Telegram Bot Setup Guide](docs/telegram-bot-setup-en.md) to configure your Telegram bot.
 
 ## Strategy Overview
 
@@ -180,6 +212,12 @@ ETH Perpetual (with grid step control):
 python runbot.py --exchange backpack --ticker ETH --quantity 0.1 --take-profit 0.02 --max-orders 40 --wait-time 450 --grid-step 0.3
 ```
 
+ETH Perpetual (with Boost mode enabled):
+
+```bash
+python runbot.py --exchange backpack --ticker ETH --direction buy --quantity 0.1 --boost
+```
+
 ### Aster Exchange:
 
 ETH:
@@ -191,7 +229,23 @@ python runbot.py --exchange aster --ticker ETH --quantity 0.1 --take-profit 0.02
 ETH (with Boost mode enabled):
 
 ```bash
-python runbot.py --exchange aster --ticker ETH --direction buy --quantity 0.1 --wait-time 450 --aster-boost
+python runbot.py --exchange aster --ticker ETH --direction buy --quantity 0.1 --boost
+```
+
+### GRVT Exchange:
+
+BTC:
+
+```bash
+python runbot.py --exchange grvt --ticker BTC --quantity 0.05 --take-profit 0.02 --max-orders 40 --wait-time 450
+```
+
+### Extended Exchange:
+
+ETH:
+
+```bash
+python runbot.py --exchange extended --ticker ETH --quantity 0.1 --take-profit 0 --max-orders 40 --wait-time 450 --grid-step 0.01
 ```
 
 ## Configuration
@@ -201,6 +255,11 @@ python runbot.py --exchange aster --ticker ETH --direction buy --quantity 0.1 --
 #### General Configuration
 
 - `ACCOUNT_NAME`: The name of the current account in the environment variable, used for distinguishing between multiple account logs, customizable, not mandatory
+
+#### Telegram Configuration (Optional)
+
+- `TELEGRAM_BOT_TOKEN`: Telegram bot token
+- `TELEGRAM_CHAT_ID`: Telegram chat ID
 
 #### EdgeX Configuration
 
@@ -230,9 +289,23 @@ python runbot.py --exchange aster --ticker ETH --direction buy --quantity 0.1 --
 - `LIGHTER_ACCOUNT_INDEX`: Lighter account index
 - `LIGHTER_API_KEY_INDEX`: Lighter API key index
 
+#### GRVT Configuration
+
+- `GRVT_TRADING_ACCOUNT_ID`: Your GRVT trading account ID
+- `GRVT_PRIVATE_KEY`: Your GRVT private key
+- `GRVT_API_KEY`: Your GRVT API key
+
+#### Extended Configuration
+
+- `EXTENDED_API_KEY`: Your Extended API key
+- `EXTENDED_STARK_KEY_PUBLIC`: Your Stark public key
+- `EXTENDED_STARK_KEY_PRIVATE`: Your Stark private key
+- `EXTENDED_VAULT`: Your Extended Vault ID
+
 **How to get LIGHTER_ACCOUNT_INDEX**:
 
 1. Add your wallet address to the end of the following URL:
+
    ```
    https://mainnet.zklighter.elliot.ai/api/v1/account?by=l1_address&value=
    ```
@@ -243,7 +316,7 @@ python runbot.py --exchange aster --ticker ETH --direction buy --quantity 0.1 --
 
 ### Command Line Arguments
 
-- `--exchange`: Exchange to use: 'edgex', 'backpack', 'paradex', 'aster', or 'lighter' (default: edgex)
+- `--exchange`: Exchange to use: 'edgex', 'backpack', 'paradex', 'aster', 'lighter', 'grvt', or 'extended' (default: edgex)
 - `--ticker`: Base asset symbol (e.g., ETH, BTC, SOL). Contract ID is auto-resolved.
 - `--quantity`: Order quantity (default: 0.1)
 - `--take-profit`: Take profit percent (e.g., 0.02 means 0.02%)
@@ -252,10 +325,10 @@ python runbot.py --exchange aster --ticker ETH --direction buy --quantity 0.1 --
 - `--max-orders`: Maximum number of active orders (default: 40)
 - `--wait-time`: Wait time between orders in seconds (default: 450)
 - `--grid-step`: Minimum distance in percentage to the next close order price (default: -100, means no restriction)
-- `--stop-price`: For BUY direction: exit when price >= stop-price. For SELL direction: exit when price <= stop-price. (Default: -1, no price-based termination)
-- `--pause-price`: For BUY direction: pause when price >= pause-price. For SELL direction: pause when price <= pause-price. (Default: -1, no price-based pausing)
-- `--aster-boost`: Enable Boost mode for volume boosting on Aster exchange (only available for aster exchange)
-  `--aster-boost` trading logic: Place maker orders to open positions, immediately close with taker orders after fill, repeat this cycle. Wear consists of one maker order, one taker order fees, and slippage.
+- `--stop-price`: When `direction` is 'buy', stop trading and exit the program when price >= stop-price; 'sell' logic is opposite (default: -1, no price-based termination). The purpose of this parameter is to prevent orders from being placed at "high points for long positions or low points for short positions that you consider".
+- `--pause-price`: When `direction` is 'buy', pause trading when price >= pause-price and resume trading when price falls back below pause-price; 'sell' logic is opposite (default: -1, no price-based pausing). The purpose of this parameter is to prevent orders from being placed at "high points for long positions or low points for short positions that you consider".
+- `--boost`: Enable Boost mode for volume boosting on Aster and Backpack exchanges (only available for 'aster' and 'backpack')
+  Boost trading logic: Place maker orders to open positions, immediately close with taker orders after fill, repeat this cycle. Wear consists of one maker order, one taker order fees, and slippage.
 
 ## Logging
 
