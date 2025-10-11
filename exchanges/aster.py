@@ -13,9 +13,8 @@ from typing import Dict, Any, List, Optional, Tuple
 from urllib.parse import urlencode
 import aiohttp
 import websockets
-from python_socks.async_ import ProxyChain
 from python_socks.async_.asyncio import Proxy
-from aiohttp_socks import ChainProxyConnector
+from aiohttp_socks import ProxyConnector
 import sys
 
 from .base import BaseExchangeClient, OrderResult, OrderInfo, query_retry
@@ -67,7 +66,7 @@ class AsterWebSocketManager:
         }
 
         async with aiohttp.ClientSession(
-                connector=ChainProxyConnector.from_urls([os.getenv('local_proxy'), os.getenv('server_proxy')])
+                connector=ProxyConnector.from_url(os.getenv('server_proxy'))
         ) as session:
             async with session.post(
                 'https://fapi.asterdex.com/fapi/v1/listenKey',
@@ -98,7 +97,7 @@ class AsterWebSocketManager:
             }
 
             async with aiohttp.ClientSession(
-                    connector=ChainProxyConnector.from_urls([os.getenv('local_proxy'), os.getenv('server_proxy')])
+                    connector=ProxyConnector.from_url(os.getenv('server_proxy'))
             ) as session:
                 async with session.put(
                     f"{self.base_url}/fapi/v1/listenKey",
@@ -191,10 +190,7 @@ class AsterWebSocketManager:
 
             # Connect to WebSocket
             ws_url = f"{self.ws_url}/ws/{self.listen_key}"
-            sock = await ProxyChain([
-                Proxy.from_url(os.getenv('local_proxy')),
-                Proxy.from_url(os.getenv('server_proxy'))
-            ]).connect('fstream.asterdex.com', 443)
+            sock = Proxy.from_url(os.getenv('server_proxy')).connect('fstream.asterdex.com', 443)
             self.websocket = await websockets.connect(ws_url, sock=sock)
             self.running = True
 
@@ -394,7 +390,7 @@ class AsterClient(BaseExchangeClient):
         }
 
         async with aiohttp.ClientSession(
-                connector=ChainProxyConnector.from_urls([os.getenv('local_proxy'), os.getenv('server_proxy')])
+                connector=ProxyConnector.from_url(os.getenv('server_proxy'))
         ) as session:
             if method.upper() == 'GET':
                 # For GET requests, signature is based on query parameters only
