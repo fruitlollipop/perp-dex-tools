@@ -222,8 +222,8 @@ class TradingBot:
         except Exception as e:
             self.logger.log(f"Error placing order: {e}", "ERROR")
             self.logger.log(f"Traceback: {traceback.format_exc()}", "ERROR")
-            # if 'Margin is insufficient' in str(e):
-            #     await self.emergency_close_all()
+            if 'Margin is insufficient' in str(e):
+                await self.emergency_close_all()
             return False
 
     async def _handle_order_result(self, order_result) -> bool:
@@ -394,6 +394,7 @@ class TradingBot:
                                 f"Order quantity: {len(self.active_close_orders)}")
                 # if len(self.active_close_orders) == self.config.max_orders:
                 #     await self.emergency_close_all()
+                #     await self.graceful_shutdown()
                 self.last_log_time = time.time()
                 # Check for position mismatch
                 if abs(position_amt - active_close_amount) > (2 * self.config.quantity):
