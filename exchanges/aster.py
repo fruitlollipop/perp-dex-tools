@@ -190,7 +190,7 @@ class AsterWebSocketManager:
 
             # Connect to WebSocket
             ws_url = f"{self.ws_url}/ws/{self.listen_key}"
-            sock = Proxy.from_url(os.getenv('server_proxy')).connect('fstream.asterdex.com', 443)
+            sock = await Proxy.from_url(os.getenv('server_proxy')).connect('fstream.asterdex.com', 443)
             self.websocket = await websockets.connect(ws_url, sock=sock)
             self.running = True
 
