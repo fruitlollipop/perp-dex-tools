@@ -8,6 +8,7 @@ import json
 import traceback
 from decimal import Decimal
 from typing import Dict, Any, List, Optional, Tuple
+from aiohttp_socks import ProxyConnector
 from edgex_sdk import Client, OrderSide, WebSocketManager, CancelOrderParams, GetOrderBookDepthParams, GetActiveOrderParams
 
 from .base import BaseExchangeClient, OrderResult, OrderInfo, query_retry
@@ -36,6 +37,14 @@ class EdgeXClient(BaseExchangeClient):
             account_id=int(self.account_id),
             stark_private_key=self.stark_private_key
         )
+        proxy_connector = ProxyConnector.from_url(
+            os.getenv('https_proxy'),
+            limit=100,
+            limit_per_host=30,
+            keepalive_timeout=30,
+            enable_cleanup_closed=True
+        )
+        self.client.async_client.session._connector = proxy_connector
 
         # Initialize WebSocket manager using official SDK
         self.ws_manager = WebSocketManager(
