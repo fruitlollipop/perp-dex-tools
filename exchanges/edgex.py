@@ -44,7 +44,7 @@ class EdgeXClient(BaseExchangeClient):
             keepalive_timeout=30,
             enable_cleanup_closed=True
         )
-        async with self.client.async_client.session as session:
+        with self.client.async_client.session as session:
             session._connector = proxy_connector
 
         # Initialize WebSocket manager using official SDK
