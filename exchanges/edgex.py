@@ -75,8 +75,10 @@ class EdgeXClient(BaseExchangeClient):
             keepalive_timeout=30,
             enable_cleanup_closed=True
         )
-        async with self.client.async_client as client:
-            client.session._connector = proxy_connector
+        await self.client.async_client._ensure_session()
+        self.client.async_client.session.connector = proxy_connector
+        # async with self.client.async_client as client:
+        #     client.session._connector = proxy_connector
         """Connect private WS and keep it alive with auto-reconnect."""
         self._loop = asyncio.get_running_loop()
 
