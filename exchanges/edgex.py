@@ -37,15 +37,6 @@ class EdgeXClient(BaseExchangeClient):
             account_id=int(self.account_id),
             stark_private_key=self.stark_private_key
         )
-        proxy_connector = ProxyConnector.from_url(
-            os.getenv('https_proxy'),
-            limit=100,
-            limit_per_host=30,
-            keepalive_timeout=30,
-            enable_cleanup_closed=True
-        )
-        with self.client.async_client.session as session:
-            session._connector = proxy_connector
 
         # Initialize WebSocket manager using official SDK
         self.ws_manager = WebSocketManager(
@@ -77,6 +68,15 @@ class EdgeXClient(BaseExchangeClient):
     # ---------------------------
 
     async def connect(self) -> None:
+        proxy_connector = ProxyConnector.from_url(
+            os.getenv('https_proxy'),
+            limit=100,
+            limit_per_host=30,
+            keepalive_timeout=30,
+            enable_cleanup_closed=True
+        )
+        async with self.client.async_client as client:
+            client.session._connector = proxy_connector
         """Connect private WS and keep it alive with auto-reconnect."""
         self._loop = asyncio.get_running_loop()
 
