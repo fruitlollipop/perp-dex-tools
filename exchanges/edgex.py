@@ -52,6 +52,14 @@ class EdgeXClient(BaseExchangeClient):
             account_id=int(self.account_id),
             stark_pri_key=self.stark_private_key
         )
+        if not self.ws_manager.private_client:
+            self.ws_manager.private_client = EdgeXWSClient(
+                url=f"{self.ws_manager.base_url}/api/v1/private/ws?accountId={self.ws_manager.account_id}",
+                is_private=True,
+                account_id=self.ws_manager.account_id,
+                stark_pri_key=self.ws_manager.stark_pri_key,
+                signing_adapter=self.ws_manager.signing_adapter
+            )
 
         # Initialize logger
         self.logger = TradingLogger(exchange="edgex", ticker=self.config.ticker, log_to_console=False)
@@ -94,16 +102,7 @@ class EdgeXClient(BaseExchangeClient):
 
         # Hook disconnect/connect once (SDK calls these from threads)
         try:
-            # private_client = self.ws_manager.get_private_client()
-            if not self.ws_manager.private_client:
-                self.ws_manager.private_client = EdgeXWSClient(
-                    url=f"{self.ws_manager.base_url}/api/v1/private/ws?accountId={self.ws_manager.account_id}",
-                    is_private=True,
-                    account_id=self.ws_manager.account_id,
-                    stark_pri_key=self.ws_manager.stark_pri_key,
-                    signing_adapter=self.ws_manager.signing_adapter
-                )
-            private_client = self.ws_manager.private_client
+            private_client = self.ws_manager.get_private_client()
             private_client.on_disconnect(
                 lambda exc: self._loop.call_soon_threadsafe(self._ws_disconnected.set)
             )
