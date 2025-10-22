@@ -135,8 +135,6 @@ class EdgeXClient(BaseExchangeClient):
                     )
                 self.ws_manager.private_client.connect()
                 self.logger.log("[WS] connected", "INFO")
-                self.ws_manager.private_client.conn.sock = await Proxy.from_url(os.getenv('server_proxy')).connect(
-                    'quote.edgex.exchange', 443)
                 backoff = 1.0
 
                 # wait until either disconnect or stop
