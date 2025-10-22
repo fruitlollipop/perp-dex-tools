@@ -85,7 +85,7 @@ class EdgeXClient(BaseExchangeClient):
 
     async def connect(self) -> None:
         proxy_connector = ProxyConnector.from_url(
-            os.getenv('https_proxy'),
+            os.getenv('server_proxy'),
             limit=100,
             limit_per_host=30,
             keepalive_timeout=30,
@@ -94,9 +94,6 @@ class EdgeXClient(BaseExchangeClient):
         await self.client.async_client._ensure_session()
         await self.client.async_client._session.close()
         self.client.async_client._session._connector = proxy_connector
-        # async with self.client.async_client as client:
-        #     client.session.close()
-        #     client.session._connector = proxy_connector
         """Connect private WS and keep it alive with auto-reconnect."""
         self._loop = asyncio.get_running_loop()
 
@@ -124,16 +121,7 @@ class EdgeXClient(BaseExchangeClient):
         while not self._ws_stop.is_set():
             try:
                 # connect
-                # self.ws_manager.connect_private()
-                if not self.ws_manager.private_client:
-                    self.ws_manager.private_client = EdgeXWSClient(
-                        url=f"{self.ws_manager.base_url}/api/v1/private/ws?accountId={self.ws_manager.account_id}",
-                        is_private=True,
-                        account_id=self.ws_manager.account_id,
-                        stark_pri_key=self.ws_manager.stark_pri_key,
-                        signing_adapter=self.ws_manager.signing_adapter
-                    )
-                self.ws_manager.private_client.connect()
+                self.ws_manager.connect_private()
                 self.logger.log("[WS] connected", "INFO")
                 backoff = 1.0
 
