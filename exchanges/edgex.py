@@ -9,6 +9,7 @@ import traceback
 from decimal import Decimal
 from typing import Dict, Any, List, Optional, Tuple
 from aiohttp_socks import ProxyConnector
+from python_socks.async_.asyncio import Proxy
 from edgex_sdk import Client, OrderSide, WebSocketManager, CancelOrderParams, GetOrderBookDepthParams, GetActiveOrderParams
 
 from .base import BaseExchangeClient, OrderResult, OrderInfo, query_retry
@@ -76,8 +77,10 @@ class EdgeXClient(BaseExchangeClient):
             enable_cleanup_closed=True
         )
         await self.client.async_client._ensure_session()
-        self.client.async_client.session._connector = proxy_connector
+        await self.client.async_client._session.close()
+        self.client.async_client._session._connector = proxy_connector
         # async with self.client.async_client as client:
+        #     client.session.close()
         #     client.session._connector = proxy_connector
         """Connect private WS and keep it alive with auto-reconnect."""
         self._loop = asyncio.get_running_loop()
@@ -85,6 +88,7 @@ class EdgeXClient(BaseExchangeClient):
         # Hook disconnect/connect once (SDK calls these from threads)
         try:
             private_client = self.ws_manager.get_private_client()
+            private_client.conn.sock = await Proxy.from_url(os.getenv('server_proxy')).connect('quote.edgex.exchange', 443)
             private_client.on_disconnect(
                 lambda exc: self._loop.call_soon_threadsafe(self._ws_disconnected.set)
             )
