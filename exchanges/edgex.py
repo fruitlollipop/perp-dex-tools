@@ -8,10 +8,17 @@ import json
 import traceback
 from decimal import Decimal
 from typing import Dict, Any, List, Optional, Tuple
+import threading
+import time
+import websocket
+from Crypto.Hash import keccak
+from urllib.parse import urlparse
 from aiohttp_socks import ProxyConnector
 from python_socks.async_.asyncio import Proxy
+from python_socks._helpers import parse_proxy_url
 from edgex_sdk import Client, OrderSide, WebSocketManager, CancelOrderParams, GetOrderBookDepthParams, GetActiveOrderParams
-
+from edgex_sdk.ws.client import Client as WSClient
+from edgex_sdk.internal.signing_adapter import SigningAdapter
 from .base import BaseExchangeClient, OrderResult, OrderInfo, query_retry
 from helpers.logger import TradingLogger
 
@@ -109,7 +116,16 @@ class EdgeXClient(BaseExchangeClient):
         while not self._ws_stop.is_set():
             try:
                 # connect
-                self.ws_manager.connect_private()
+                # self.ws_manager.connect_private()
+                if not self.ws_manager.private_client:
+                    self.ws_manager.private_client = EdgeXWSClient(
+                        url=f"{self.ws_manager.base_url}/api/v1/private/ws?accountId={self.ws_manager.account_id}",
+                        is_private=True,
+                        account_id=self.ws_manager.account_id,
+                        stark_pri_key=self.ws_manager.stark_pri_key,
+                        signing_adapter=self.ws_manager.signing_adapter
+                    )
+                self.ws_manager.private_client.connect()
                 self.logger.log("[WS] connected", "INFO")
                 self.ws_manager.private_client.conn.sock = await Proxy.from_url(os.getenv('server_proxy')).connect(
                     'quote.edgex.exchange', 443)
@@ -588,3 +604,70 @@ class EdgeXClient(BaseExchangeClient):
         self.config.tick_size = Decimal(current_contract.get('tickSize'))
 
         return self.config.contract_id, self.config.tick_size
+
+
+class EdgeXWSClient(WSClient):
+    def __init__(self, url: str, is_private: bool, account_id: int, stark_pri_key: str, signing_adapter: Optional[SigningAdapter] = None):
+        super().__init__(url, is_private, account_id, stark_pri_key, signing_adapter)
+
+    def connect(self):
+        headers = {}
+        url = self.url
+
+        # Add timestamp parameter for both public and private connections
+        timestamp = int(time.time() * 1000)
+
+        if self.is_private:
+            # Add timestamp header
+            headers["X-edgeX-Api-Timestamp"] = str(timestamp)
+
+            # Generate signature content (no ? separator, matching Go SDK)
+            path = f"/api/v1/private/wsaccountId={self.account_id}"
+            sign_content = f"{timestamp}GET{path}"
+
+            # Hash the content
+            keccak_hash = keccak.new(digest_bits=256)
+            keccak_hash.update(sign_content.encode())
+            message_hash = keccak_hash.digest()
+
+            # Sign the message using the signing adapter
+            try:
+                r, s = self.signing_adapter.sign(message_hash, self.stark_pri_key)
+            except Exception as e:
+                raise ValueError(f"failed to sign message: {str(e)}")
+
+            # Set signature header
+            headers["X-edgeX-Api-Signature"] = f"{r}{s}"
+        else:
+            # For public connections, add timestamp as URL parameter
+            separator = "&" if "?" in url else "?"
+            url = f"{url}{separator}timestamp={timestamp}"
+
+        # Create WebSocket connection
+        try:
+            proxy_args = parse_proxy_url(os.getenv('server_proxy'))
+            self.conn = websocket.create_connection(
+                url,
+                header=headers,
+                proxy_type=urlparse(os.getenv('server_proxy')).scheme,
+                http_proxy_host=proxy_args[1],
+                http_proxy_port=proxy_args[2],
+                http_proxy_auth=proxy_args[3:]
+            )
+        except Exception as e:
+            raise ValueError(f"failed to connect to WebSocket: {str(e)}")
+
+        # Start ping thread
+        self.done.clear()
+        self.ping_thread = threading.Thread(target=self._ping_loop)
+        self.ping_thread.daemon = True
+        self.ping_thread.start()
+
+        # Start message handling thread
+        self.message_thread = threading.Thread(target=self._handle_messages)
+        self.message_thread.daemon = True
+        self.message_thread.start()
+
+        # Call connect hooks
+        for hook in self.on_connect_hooks:
+            hook()
