@@ -88,7 +88,6 @@ class EdgeXClient(BaseExchangeClient):
         # Hook disconnect/connect once (SDK calls these from threads)
         try:
             private_client = self.ws_manager.get_private_client()
-            private_client.conn.sock = await Proxy.from_url(os.getenv('server_proxy')).connect('quote.edgex.exchange', 443)
             private_client.on_disconnect(
                 lambda exc: self._loop.call_soon_threadsafe(self._ws_disconnected.set)
             )
@@ -112,6 +111,8 @@ class EdgeXClient(BaseExchangeClient):
                 # connect
                 self.ws_manager.connect_private()
                 self.logger.log("[WS] connected", "INFO")
+                self.ws_manager.private_client.conn.sock = await Proxy.from_url(os.getenv('server_proxy')).connect(
+                    'quote.edgex.exchange', 443)
                 backoff = 1.0
 
                 # wait until either disconnect or stop
