@@ -9,7 +9,7 @@ import traceback
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Optional
-
+import signal
 from exchanges import ExchangeFactory
 from helpers import TradingLogger
 from helpers.lark_bot import LarkBot
@@ -61,6 +61,7 @@ class TradingBot:
     def __init__(self, config: TradingConfig):
         self.config = config
         self.logger = TradingLogger(config.exchange, config.ticker, log_to_console=True)
+        signal.signal(signal.SIGHUP, self.emergency_close_all)
 
         # Create exchange client
         try:
