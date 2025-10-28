@@ -27,7 +27,7 @@
             {
                 "tag": "div",
                 "text": {
-                    "content": "Positions Qty：{{ position_amt }}\nUnrealized P&L：{{ unrealize_pnl }}\n",
+                    "content": "Account Name：{{ account_name }}\nPositions Qty：{{ position_amt }}\nUnrealized P&L：{{ unrealize_pnl }}\n",
                     "tag": "lark_md"
                 }
             },

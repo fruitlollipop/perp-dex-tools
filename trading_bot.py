@@ -707,6 +707,7 @@ def send_feishu_alert(config: TradingConfig, position_amt, unrealize_pnl):
     sign = base64.b64encode(hmac_code).decode('utf-8')
     feishu_msg_template = Environment(loader=FileSystemLoader(Path(__file__).parent)).get_template('feishu-card.json')
     feishu_body = json.loads(feishu_msg_template.render(
+        account_name=os.getenv('ACCOUNT_NAME'),
         config=config,
         ts=ts,
         sign=sign,
