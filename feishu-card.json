@@ -1,0 +1,121 @@
+{
+    "timestamp": "{{ ts }}",
+    "sign": "{{ sign }}",
+    "msg_type": "interactive",
+    "card": {
+        "header": {
+            "template": "blue",
+            "title": {
+                "content": "😃 达到止盈/止损条件，平仓出场通知",
+                "tag": "plain_text"
+            }
+        },
+        "config": {
+            "wide_screen_mode": true
+        },
+        "elements": [
+            {
+                "tag": "hr"
+            },
+            {
+                "tag": "div",
+                "text": {
+                    "content": "**持仓信息**",
+                    "tag": "lark_md"
+                }
+            },
+            {
+                "tag": "div",
+                "text": {
+                    "content": "Positions Qty：{{ position_amt }}\nUnrealized P&L：{{ unrealize_pnl }}\n",
+                    "tag": "lark_md"
+                }
+            },
+            {
+                "tag": "hr"
+            },
+            {
+                "tag": "div",
+                "text": {
+                    "content": "**交易信息**",
+                    "tag": "lark_md"
+                }
+            },
+            {
+                "tag": "div",
+                "fields": [
+                    {
+                        "is_short": true,
+                        "text": {
+                            "tag": "lark_md",
+                            "content": "**Exchange：**\n{{ config.exchange }}"
+                        }
+                    },
+                    {
+                        "is_short": true,
+                        "text": {
+                            "tag": "lark_md",
+                            "content": "**Direction：**\n{{ config.direction }}"
+                        }
+                    },
+                    {
+                        "is_short": true,
+                        "text": {
+                            "tag": "lark_md",
+                            "content": "**Ticker：**\n{{ config.ticker }}"
+                        }
+                    },
+                    {
+                        "is_short": true,
+                        "text": {
+                            "tag": "lark_md",
+                            "content": "**Tick Size：**\n{{ config.tick_size }}"
+                        }
+                    },
+                    {
+                        "is_short": true,
+                        "text": {
+                            "tag": "lark_md",
+                            "content": "**Quantity：**\n{{ config.quantity }}"
+                        }
+                    },
+                    {
+                        "is_short": true,
+                        "text": {
+                            "tag": "lark_md",
+                            "content": "**Max Orders：**\n{{ config.max_orders }}"
+                        }
+                    },
+                    {
+                        "is_short": true,
+                        "text": {
+                            "tag": "lark_md",
+                            "content": "**Take Profit：**\n{{ config.take_profit }}"
+                        }
+                    },
+                    {
+                        "is_short": true,
+                        "text": {
+                            "tag": "lark_md",
+                            "content": "**Grid Step：**\n{{ config.grid_step }}"
+                        }
+                    },
+                    {
+                        "is_short": true,
+                        "text": {
+                            "tag": "lark_md",
+                            "content": "**TP：**\n{{ config.tp }}"
+                        }
+                    },
+                    {
+                        "is_short": true,
+                        "text": {
+                            "tag": "lark_md",
+                            "content": "**SL：**\n{{ config.sl }}"
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+}

@@ -1,7 +1,7 @@
 """
 Modular Trading Bot - Supports multiple exchanges
 """
-
+import json
 import os
 import time
 import asyncio
@@ -10,6 +10,12 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Optional
 import signal
+import hashlib
+import base64
+import hmac
+import requests
+from pathlib import Path
+from jinja2 import Environment, FileSystemLoader
 from exchanges import ExchangeFactory
 from helpers import TradingLogger
 from helpers.lark_bot import LarkBot
@@ -32,6 +38,8 @@ class TradingConfig:
     stop_price: Decimal
     pause_price: Decimal
     boost_mode: bool
+    tp: Decimal
+    sl: Decimal
 
     @property
     def close_order_side(self) -> str:
@@ -61,7 +69,7 @@ class TradingBot:
     def __init__(self, config: TradingConfig):
         self.config = config
         self.logger = TradingLogger(config.exchange, config.ticker, log_to_console=True)
-        signal.signal(signal.SIGHUP, self.emergency_close_all)
+        # signal.signal(signal.SIGHUP, self.emergency_close_all)
 
         # Create exchange client
         try:
@@ -424,7 +432,10 @@ class TradingBot:
                 if self.config.exchange == "edgex":
                     unrealize_pnl = await self.exchange_client.get_account_unrealize_Pnl()
                     self.logger.log(f"Current Unrealize P&L: {unrealize_pnl}", "INFO")
-
+                    if self.config.sl < 0 < self.config.tp:
+                        if unrealize_pnl >= self.config.tp or unrealize_pnl <= self.config.sl:
+                            await self.emergency_close_all()
+                            send_feishu_alert(self.config, position_amt, unrealize_pnl)
                 return mismatch_detected
 
             except Exception as e:
@@ -579,6 +590,7 @@ class TradingBot:
 
         except KeyboardInterrupt:
             self.logger.log("Bot stopped by user")
+            await self.emergency_close_all()
             await self.graceful_shutdown("User interruption (Ctrl+C)")
         except Exception as e:
             self.logger.log(f"Critical error: {e}", "ERROR")
@@ -687,3 +699,19 @@ class TradingBot:
             self.logger.log(f"紧急全部平仓操作失败: {e}", "ERROR")
             return False
 
+
+def send_feishu_alert(config: TradingConfig, position_amt, unrealize_pnl):
+    ts = int(time.time())
+    string_to_sign = '{}\n{}'.format(ts, os.getenv('FEISHU_WEBHOOK_SECRET'))
+    hmac_code = hmac.new(string_to_sign.encode("utf-8"), digestmod=hashlib.sha256).digest()
+    sign = base64.b64encode(hmac_code).decode('utf-8')
+    feishu_msg_template = Environment(loader=FileSystemLoader(Path(__file__).parent)).get_template('feishu-card.json')
+    feishu_body = json.loads(feishu_msg_template.render(
+        config=config,
+        ts=ts,
+        sign=sign,
+        unrealize_pnl=unrealize_pnl,
+        position_amt=position_amt
+    ))
+    res = requests.post(os.getenv('FEISHU_WEBHOOK_URL'), headers={'Content-Type': 'APPLICATION_JSON_UTF8'}, json=feishu_body)
+    assert res.status_code == 200, f"Send Feishu alert failed: {res.text}"
