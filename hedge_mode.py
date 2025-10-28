@@ -12,6 +12,7 @@ Supported exchanges:
     - backpack: Uses HedgeBot from hedge_mode_bp.py (Backpack + Lighter)
     - extended: Uses HedgeBot from hedge_mode_ext.py (Extended + Lighter)
     - apex: Uses HedgeBot from hedge_mode_apex.py (Apex + Lighter)
+    - grvt: Uses HedgeBot from hedge_mode_grvt.py (GRVT + Lighter)
 
 Cross-platform compatibility:
     - Works on Linux, macOS, and Windows
@@ -35,11 +36,12 @@ Examples:
     python hedge_mode.py --exchange backpack --ticker BTC --size 0.002 --iter 10
     python hedge_mode.py --exchange extended --ticker ETH --size 0.1 --iter 5
     python hedge_mode.py --exchange apex --ticker BTC --size 0.002 --iter 10
+    python hedge_mode.py --exchange grvt --ticker BTC --size 0.05 --iter 10
         """
     )
     
     parser.add_argument('--exchange', type=str, required=True,
-                        help='Exchange to use (backpack, extended, or apex)')
+                        help='Exchange to use (backpack, extended, apex, or grvt)')
     parser.add_argument('--ticker', type=str, default='BTC',
                         help='Ticker symbol (default: BTC)')
     parser.add_argument('--size', type=str, required=True,
@@ -56,7 +58,7 @@ Examples:
 
 def validate_exchange(exchange):
     """Validate that the exchange is supported."""
-    supported_exchanges = ['backpack', 'extended', 'apex']
+    supported_exchanges = ['backpack', 'extended', 'apex', 'grvt']
     if exchange.lower() not in supported_exchanges:
         print(f"Error: Unsupported exchange '{exchange}'")
         print(f"Supported exchanges: {', '.join(supported_exchanges)}")
@@ -74,6 +76,9 @@ def get_hedge_bot_class(exchange):
             return HedgeBot
         elif exchange.lower() == 'apex':
             from hedge.hedge_mode_apex import HedgeBot
+            return HedgeBot
+        elif exchange.lower() == 'grvt':
+            from hedge.hedge_mode_grvt import HedgeBot
             return HedgeBot
         else:
             raise ValueError(f"Unsupported exchange: {exchange}")

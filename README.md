@@ -313,11 +313,14 @@ python hedge_mode.py --exchange extended --ticker ETH --size 0.1 --iter 20
 
 # 运行 BTC 对冲模式（Apex）
 python hedge_mode.py --exchange apex --ticker BTC --size 0.05 --iter 20
+
+# 运行 BTC 对冲模式（GRVT）
+python hedge_mode.py --exchange grvt --ticker BTC --size 0.05 --iter 20
 ```
 
 ### 对冲模式参数
 
-- `--exchange`: 主要交易所（支持 'backpack', 'extended', 'apex'）
+- `--exchange`: 主要交易所（支持 'backpack', 'extended', 'apex', 'grvt'）
 - `--ticker`: 交易对符号（如 BTC, ETH）
 - `--size`: 每笔订单数量
 - `--iter`: 交易循环次数

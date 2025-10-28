@@ -287,11 +287,14 @@ python hedge_mode.py --exchange extended --ticker ETH --size 0.1 --iter 20
 
 # Run BTC hedge mode with Apex
 python hedge_mode.py --exchange apex --ticker BTC --size 0.05 --iter 20
+
+# Run BTC hedge mode with GRVT
+python hedge_mode.py --exchange grvt --ticker BTC --size 0.05 --iter 20
 ```
 
 ### Hedge Mode Parameters
 
-- `--exchange`: Primary exchange (supports 'backpack', 'extended', 'apex')
+- `--exchange`: Primary exchange (supports 'backpack', 'extended', 'apex', 'grvt')
 - `--ticker`: Trading pair symbol (e.g., BTC, ETH)
 - `--size`: Order quantity per trade
 - `--iter`: Number of trading cycles
