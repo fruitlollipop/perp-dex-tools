@@ -584,7 +584,7 @@ class TradingBot:
                             await asyncio.sleep(1)
                             continue
 
-                        if await self.exchange_client.get_account_positions() <= self.config.quantity:
+                        if await self.exchange_client.get_account_positions() < self.config.quantity:
                             await self._place_and_monitor_open_order()
                             self.last_close_orders += 1
 
