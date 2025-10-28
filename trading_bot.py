@@ -421,6 +421,9 @@ class TradingBot:
                 else:
                     mismatch_detected = False
 
+                if self.config.exchange == "edgex":
+                    self.logger.log(f"Current Unrealize P&L: {self.exchange_client.get_account_unrealize_Pnl()}", "INFO")
+
                 return mismatch_detected
 
             except Exception as e:
@@ -569,8 +572,9 @@ class TradingBot:
                             await asyncio.sleep(1)
                             continue
 
-                        await self._place_and_monitor_open_order()
-                        self.last_close_orders += 1
+                        if await self.exchange_client.get_account_positions() <= self.config.quantity:
+                            await self._place_and_monitor_open_order()
+                            self.last_close_orders += 1
 
         except KeyboardInterrupt:
             self.logger.log("Bot stopped by user")

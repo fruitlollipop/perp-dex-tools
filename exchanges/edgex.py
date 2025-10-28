@@ -561,6 +561,32 @@ class EdgeXClient(BaseExchangeClient):
                 position_amt = 0
         return position_amt
 
+    @query_retry(default_return=0)
+    async def get_account_unrealize_Pnl(self) -> Decimal:
+        """Get account assets using official SDK."""
+        asset_data = await self.client.get_account_asset()
+        if not asset_data or 'data' not in asset_data:
+            self.logger.log("No assets or failed to get assets", "WARNING")
+            unrealize_pnl_amt = 0
+        else:
+            # The API returns assets under data.positionAssetList
+            assets = asset_data.get('data', {}).get('positionAssetList', [])
+            if assets:
+                # Find asset for current contract
+                asset = None
+                for p in assets:
+                    if isinstance(p, dict) and p.get('contractId') == self.config.contract_id:
+                        asset = p
+                        break
+
+                if asset:
+                    unrealize_pnl_amt = Decimal(asset.get('unrealizePnl', 0))
+                else:
+                    unrealize_pnl_amt = 0
+            else:
+                unrealize_pnl_amt = 0
+        return unrealize_pnl_amt
+
     async def get_contract_attributes(self) -> Tuple[str, Decimal]:
         """Get contract ID for a ticker."""
         ticker = self.config.ticker
