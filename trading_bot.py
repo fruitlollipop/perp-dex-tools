@@ -422,7 +422,8 @@ class TradingBot:
                     mismatch_detected = False
 
                 if self.config.exchange == "edgex":
-                    self.logger.log(f"Current Unrealize P&L: {self.exchange_client.get_account_unrealize_Pnl()}", "INFO")
+                    unrealize_pnl = await self.exchange_client.get_account_unrealize_Pnl()
+                    self.logger.log(f"Current Unrealize P&L: {unrealize_pnl}", "INFO")
 
                 return mismatch_detected
 
