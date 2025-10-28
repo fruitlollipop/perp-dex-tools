@@ -634,10 +634,11 @@ class TradingBot:
 
             # 下平仓单
             if self.config.exchange == 'edgex':
+                from edgex_sdk import OrderSide
                 order_result = await self.exchange_client.client.create_market_order(
                     contract_id=self.config.contract_id,
                     size=str(position_amt),
-                    side=close_side
+                    side=OrderSide.BUY if close_side.lower() == 'buy' else OrderSide.SELL
                 )
             else:
                 close_order_result = await self.exchange_client.place_close_order(
