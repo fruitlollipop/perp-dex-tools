@@ -633,20 +633,27 @@ class TradingBot:
                 close_price = best_ask + self.config.tick_size  # 略高于卖一价确保买入成交
 
             # 下平仓单
-            close_order_result = await self.exchange_client.place_close_order(
-                self.config.contract_id,
-                position_amt,
-                close_price,
-                close_side
-            )
-
-            if close_order_result.success:
-                self.logger.log(f"全部平仓订单已提交: ID {close_order_result.order_id}, "
-                                f"方向 {close_side}, 数量 {position_amt}, 价格 {close_price}", "INFO")
-                return True
+            if self.config.exchange == 'edgex':
+                order_result = await self.exchange_client.client.create_market_order(
+                    contract_id=self.config.contract_id,
+                    size=str(position_amt),
+                    side=close_side
+                )
             else:
-                self.logger.log(f"全部平仓订单提交失败: {close_order_result.error_message}", "ERROR")
-                return False
+                close_order_result = await self.exchange_client.place_close_order(
+                    self.config.contract_id,
+                    position_amt,
+                    close_price,
+                    close_side
+                )
+
+                if close_order_result.success:
+                    self.logger.log(f"全部平仓订单已提交: ID {close_order_result.order_id}, "
+                                    f"方向 {close_side}, 数量 {position_amt}, 价格 {close_price}", "INFO")
+                    return True
+                else:
+                    self.logger.log(f"全部平仓订单提交失败: {close_order_result.error_message}", "ERROR")
+                    return False
 
         except Exception as e:
             self.logger.log(f"全部平仓过程中出错: {e}", "ERROR")

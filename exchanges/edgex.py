@@ -405,17 +405,12 @@ class EdgeXClient(BaseExchangeClient):
 
                 adjusted_price = self.round_to_tick(adjusted_price)
                 # Place the order using official SDK (post-only to avoid taker fees)
-                # order_result = await self.client.create_limit_order(
-                #     contract_id=contract_id,
-                #     size=str(quantity),
-                #     price=str(adjusted_price),
-                #     side=order_side,
-                #     post_only=True
-                # )
-                order_result = await self.client.create_market_order(
+                order_result = await self.client.create_limit_order(
                     contract_id=contract_id,
                     size=str(quantity),
-                    side=order_side
+                    price=str(adjusted_price),
+                    side=order_side,
+                    post_only=True
                 )
 
                 if not order_result or 'data' not in order_result:
