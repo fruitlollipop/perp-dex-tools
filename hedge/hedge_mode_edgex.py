@@ -197,11 +197,24 @@ class HedgeBot:
             if not api_key_private_key:
                 raise Exception("API_KEY_PRIVATE_KEY environment variable not set")
 
+            import aiohttp
+            from aiohttp_socks import ProxyConnector
+            from lighter.api_client import ApiClient, Configuration
+            api_client = ApiClient(Configuration(host=self.lighter_base_url))
+            api_client.rest_client.pool_manager = aiohttp.ClientSession(
+                connector=ProxyConnector.from_url(os.getenv('server_proxy')),
+                trust_env=True
+            )
+            ApiClient.set_default(api_client)
             self.lighter_client = SignerClient(
                 url=self.lighter_base_url,
                 private_key=api_key_private_key,
                 api_key_index=self.api_key_index,
                 account_index=self.account_index,
+            )
+            self.lighter_client.api_client.rest_client.pool_manager = aiohttp.ClientSession(
+                connector=ProxyConnector.from_url(os.getenv('server_proxy')),
+                trust_env=True
             )
 
             # Check client
@@ -230,6 +243,23 @@ class HedgeBot:
             account_id=int(self.edgex_account_id),
             stark_pri_key=self.edgex_stark_private_key
         )
+        from exchanges.edgex import EdgeXWSClient
+        if not self.edgex_ws_manager.private_client:
+            self.edgex_ws_manager.private_client = EdgeXWSClient(
+                url=f"{self.edgex_ws_manager.base_url}/api/v1/private/ws?accountId={self.edgex_ws_manager.account_id}",
+                is_private=True,
+                account_id=self.edgex_ws_manager.account_id,
+                stark_pri_key=self.edgex_ws_manager.stark_pri_key,
+                signing_adapter=self.edgex_ws_manager.signing_adapter
+            )
+        if not self.edgex_ws_manager.public_client:
+            self.edgex_ws_manager.public_client = EdgeXWSClient(
+                url=f"{self.edgex_ws_manager.base_url}/api/v1/public/ws",
+                is_private=False,
+                account_id=self.edgex_ws_manager.account_id,
+                stark_pri_key=self.edgex_ws_manager.stark_pri_key,
+                signing_adapter=self.edgex_ws_manager.signing_adapter
+            )
 
         self.logger.info("✅ edgeX client initialized successfully")
         return self.edgex_client
@@ -240,7 +270,7 @@ class HedgeBot:
         headers = {"accept": "application/json"}
 
         try:
-            response = requests.get(url, headers=headers, timeout=10)
+            response = requests.get(url, headers=headers, timeout=10, proxies={"https": os.getenv('server_proxy')})
             response.raise_for_status()
 
             if not response.text.strip():
@@ -608,8 +638,9 @@ class HedgeBot:
             try:
                 # Reset order book state before connecting
                 await self.reset_lighter_order_book()
-                
-                async with websockets.connect(url) as ws:
+
+                from python_socks.sync import Proxy
+                async with websockets.connect(url, sock=Proxy.from_url(os.getenv('server_proxy')).connect('mainnet.zklighter.elliot.ai', 443)) as ws:
                     # Subscribe to order book updates
                     await ws.send(json.dumps({"type": "subscribe", "channel": f"order_book/{self.lighter_market_index}"}))
 
@@ -1034,7 +1065,18 @@ class HedgeBot:
         try:
             await self.initialize_lighter_client()
             self.initialize_edgex_client()
-            
+
+            from aiohttp_socks import ProxyConnector
+            proxy_connector = ProxyConnector.from_url(
+                os.getenv('server_proxy'),
+                limit=100,
+                limit_per_host=30,
+                keepalive_timeout=30,
+                enable_cleanup_closed=True
+            )
+            await self.edgex_client.async_client._ensure_session()
+            await self.edgex_client.async_client._session.close()
+            self.edgex_client.async_client._session._connector = proxy_connector
             # Get contract info
             self.edgex_contract_id, self.edgex_tick_size = await self.get_edgex_contract_info()
             self.lighter_market_index, self.base_amount_multiplier, self.price_multiplier = await self.get_lighter_market_config()
