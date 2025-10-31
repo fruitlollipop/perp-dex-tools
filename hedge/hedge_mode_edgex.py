@@ -34,7 +34,7 @@ def send_feishu_alert(args, msg):
     string_to_sign = '{}\n{}'.format(ts, os.getenv('FEISHU_WEBHOOK_SECRET'))
     hmac_code = hmac.new(string_to_sign.encode("utf-8"), digestmod=hashlib.sha256).digest()
     sign = base64.b64encode(hmac_code).decode('utf-8')
-    feishu_msg_template = Environment(loader=FileSystemLoader(Path(__file__).parent)).get_template('feishu-hedge-alert.json')
+    feishu_msg_template = Environment(loader=FileSystemLoader(Path(__file__).parent.parent)).get_template('feishu-hedge-alert.json')
     feishu_body = json.loads(feishu_msg_template.render(
         account_name=os.getenv('ACCOUNT_NAME'),
         args=args,
