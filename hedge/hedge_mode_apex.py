@@ -545,7 +545,7 @@ class HedgeBot:
         self.logger.info("✅ Apex client initialized successfully")
         return self.apex_client
 
-    def get_lighter_market_config(self) -> Tuple[int, int, int]:
+    def get_lighter_market_config(self) -> Tuple[int, int, int, Decimal]:
         """Get Lighter market configuration."""
         url = f"{self.lighter_base_url}/api/v1/orderBooks"
         headers = {"accept": "application/json"}
@@ -926,7 +926,7 @@ class HedgeBot:
 
             # Get contract info
             self.apex_contract_id, self.apex_tick_size = await self.get_apex_contract_info()
-            self.lighter_market_index, self.base_amount_multiplier, self.price_multiplier, self.tick_size = await self.get_lighter_market_config()
+            self.lighter_market_index, self.base_amount_multiplier, self.price_multiplier, self.tick_size = self.get_lighter_market_config()
 
             self.logger.info(f"Contract info loaded - Apex: {self.apex_contract_id}, "
                              f"Lighter: {self.lighter_market_index}")

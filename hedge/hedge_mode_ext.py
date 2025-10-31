@@ -546,7 +546,7 @@ class HedgeBot:
         self.logger.info("✅ Extended client initialized successfully")
         return self.extended_client
 
-    def get_lighter_market_config(self) -> Tuple[int, int, int]:
+    def get_lighter_market_config(self) -> Tuple[int, int, int, Decimal]:
         """Get Lighter market configuration."""
         url = f"{self.lighter_base_url}/api/v1/orderBooks"
         headers = {"accept": "application/json"}
@@ -1043,7 +1043,7 @@ class HedgeBot:
 
             # Get contract info
             self.extended_contract_id, self.extended_tick_size = await self.get_extended_contract_info()
-            self.lighter_market_index, self.base_amount_multiplier, self.price_multiplier, self.tick_size = await self.get_lighter_market_config()
+            self.lighter_market_index, self.base_amount_multiplier, self.price_multiplier, self.tick_size = self.get_lighter_market_config()
 
             self.logger.info(f"Contract info loaded - Extended: {self.extended_contract_id}, "
                              f"Lighter: {self.lighter_market_index}")

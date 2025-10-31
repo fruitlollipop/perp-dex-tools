@@ -290,7 +290,7 @@ class HedgeBot:
         self.logger.info("✅ edgeX client initialized successfully")
         return self.edgex_client
 
-    async def get_lighter_market_config(self) -> Tuple[int, int, int]:
+    async def get_lighter_market_config(self) -> Tuple[int, int, int, Decimal]:
         """Get Lighter market configuration."""
         url = f"{self.lighter_base_url}/api/v1/orderBooks"
         headers = {"accept": "application/json"}
