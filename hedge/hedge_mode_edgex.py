@@ -22,6 +22,30 @@ import dotenv
 dotenv.load_dotenv()
 
 
+def send_feishu_alert(args, msg):
+    import time, os, json
+    import hashlib
+    import base64
+    import hmac
+    import requests
+    from pathlib import Path
+    from jinja2 import Environment, FileSystemLoader
+    ts = int(time.time())
+    string_to_sign = '{}\n{}'.format(ts, os.getenv('FEISHU_WEBHOOK_SECRET'))
+    hmac_code = hmac.new(string_to_sign.encode("utf-8"), digestmod=hashlib.sha256).digest()
+    sign = base64.b64encode(hmac_code).decode('utf-8')
+    feishu_msg_template = Environment(loader=FileSystemLoader(Path(__file__).parent)).get_template('feishu-hedge-alert.json')
+    feishu_body = json.loads(feishu_msg_template.render(
+        account_name=os.getenv('ACCOUNT_NAME'),
+        args=args,
+        ts=ts,
+        sign=sign,
+        msg=msg
+    ))
+    res = requests.post(os.getenv('FEISHU_WEBHOOK_URL'), headers={'Content-Type': 'APPLICATION_JSON_UTF8'}, json=feishu_body)
+    assert res.status_code == 200, f"Send Feishu alert failed: {res.text}"
+
+
 class HedgeBot:
     """Trading bot that places post-only orders on edgeX and hedges with market orders on Lighter."""
 
@@ -37,8 +61,8 @@ class HedgeBot:
 
         # Initialize logging to file
         os.makedirs("logs", exist_ok=True)
-        self.log_filename = f"logs/{ticker}_hedge_mode_log.txt"
-        self.csv_filename = f"logs/{ticker}_hedge_mode_trades.csv"
+        self.log_filename = f"logs/edgex_{ticker}_{os.getenv('ACCOUNT_NAME')}_hedge_mode_log.txt"
+        self.csv_filename = f"logs/edgex_{ticker}_{os.getenv('ACCOUNT_NAME')}_hedge_mode_trades.csv"
         self.original_stdout = sys.stdout
 
         # Initialize CSV file with headers if it doesn't exist
@@ -139,6 +163,7 @@ class HedgeBot:
         self.logger.info("\n🛑 Stopping...")
 
         # Close WebSocket connections
+        asyncio.create_task(self.edgex_client.close())
         if self.edgex_ws_manager:
             try:
                 self.edgex_ws_manager.disconnect_all()
@@ -147,6 +172,7 @@ class HedgeBot:
                 self.logger.error(f"Error disconnecting edgeX WebSocket: {e}")
 
         # Cancel Lighter WebSocket task
+        asyncio.create_task(self.lighter_client.close())
         if self.lighter_ws_task and not self.lighter_ws_task.done():
             try:
                 self.lighter_ws_task.cancel()
@@ -432,6 +458,11 @@ class HedgeBot:
                         cancel_params = CancelOrderParams(order_id=order_id)
                         # Cancel the order using official SDK
                         self.logger.info(f"[{order_id}] [OPEN] [edgeX] [{side}] Time out - Canceling edgeX order.")
+                        from types import SimpleNamespace
+                        send_feishu_alert(
+                            args=SimpleNamespace(exchange='edgex', ticker=self.ticker, size=self.order_quantity, iter=self.iterations),
+                            msg=f'Time out - Canceling edgeX order. Order ID: {order_id}'
+                        )
                         cancel_result = await self.edgex_client.cancel_order(cancel_params)
                         await asyncio.sleep(1)
                     except Exception as e:

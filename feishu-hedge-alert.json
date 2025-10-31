@@ -1,0 +1,87 @@
+{
+    "timestamp": "{{ ts }}",
+    "sign": "{{ sign }}",
+    "msg_type": "post",
+    "content": {
+        "post": {
+            "zh_cn": {
+                "title": "Hedge Mode Alert",
+                "content": [
+                    [
+                        {
+                            "tag": "text",
+                            "text": "编号："
+                        },
+                        {
+                            "tag": "text",
+                            "text": "{{ account_name }}"
+                        }
+                    ],
+                    [
+                        {
+                            "tag": "text",
+                            "text": "交易所："
+                        },
+                        {
+                            "tag": "text",
+                            "text": "{{ args.exchange }}"
+                        }
+                    ],
+                    [
+                        {
+                            "tag": "text",
+                            "text": "货币代号："
+                        },
+                        {
+                            "tag": "text",
+                            "text": "{{ args.ticker }}"
+                        }
+                    ],
+                    [
+                        {
+                            "tag": "text",
+                            "text": "订单大小："
+                        },
+                        {
+                            "tag": "text",
+                            "text": "{{ args.size }}"
+                        }
+                    ],
+                    [
+                        {
+                            "tag": "text",
+                            "text": "交易次数："
+                        },
+                        {
+                            "tag": "text",
+                            "text": "{{ args.iter }}"
+                        }
+                    ],
+                    [
+                        {
+                            "tag": "text",
+                            "text": "告警信息："
+                        }
+                    ],
+                    [
+                        {
+                            "tag": "text",
+                            "text": "异常详情："
+                        },
+                        {
+                            "tag": "text",
+                            "text": "{{ msg }}"
+                        }
+                    ],
+                    [
+                        {
+                            "tag": "at",
+                            "user_id": "all",
+                            "user_name": "所有人"
+                        }
+                    ]
+                ]
+            }
+        }
+    }
+}

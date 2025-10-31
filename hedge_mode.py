@@ -138,6 +138,8 @@ async def main():
         print(f"Error running hedge mode: {e}")
         import traceback
         print(f"Full traceback: {traceback.format_exc()}")
+        from hedge.hedge_mode_edgex import send_feishu_alert
+        send_feishu_alert(args, f'{e}')
         return 1
     
     return 0
