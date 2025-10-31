@@ -459,10 +459,10 @@ class HedgeBot:
                         # Cancel the order using official SDK
                         self.logger.info(f"[{order_id}] [OPEN] [edgeX] [{side}] Time out - Canceling edgeX order.")
                         from types import SimpleNamespace
-                        send_feishu_alert(
-                            args=SimpleNamespace(exchange='edgex', ticker=self.ticker, size=self.order_quantity, iter=self.iterations),
-                            msg=f'Time out - Canceling edgeX order. Order ID: {order_id}'
-                        )
+                        # send_feishu_alert(
+                        #     args=SimpleNamespace(exchange='edgex', ticker=self.ticker, size=self.order_quantity, iter=self.iterations),
+                        #     msg=f'Time out - Canceling edgeX order. Order ID: {order_id}'
+                        # )
                         cancel_result = await self.edgex_client.cancel_order(cancel_params)
                         await asyncio.sleep(1)
                     except Exception as e:
