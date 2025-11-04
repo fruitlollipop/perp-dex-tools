@@ -1206,11 +1206,11 @@ class HedgeBot:
                 else:
                     self.logger.error(f"⚠️ ValueError in trading loop: {e}")
                     self.logger.error(f"⚠️ Full traceback: {traceback.format_exc()}")
-                    break
+                    # break
             except Exception as e:
                 self.logger.error(f"⚠️ Error in trading loop: {e}")
                 self.logger.error(f"⚠️ Full traceback: {traceback.format_exc()}")
-                break
+                # break
 
             # Wait for edgeX order to fill and then place Lighter order
             start_time = time.time()
