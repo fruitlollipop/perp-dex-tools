@@ -225,13 +225,13 @@ class HedgeBot:
 
             import aiohttp
             from aiohttp_socks import ProxyConnector
-            from lighter.api_client import ApiClient, Configuration
-            api_client = ApiClient(Configuration(host=self.lighter_base_url))
-            api_client.rest_client.pool_manager = aiohttp.ClientSession(
-                connector=ProxyConnector.from_url(os.getenv('server_proxy')),
-                trust_env=True
-            )
-            ApiClient.set_default(api_client)
+            # from lighter.api_client import ApiClient, Configuration
+            # api_client = ApiClient(Configuration(host=self.lighter_base_url))
+            # api_client.rest_client.pool_manager = aiohttp.ClientSession(
+            #     connector=ProxyConnector.from_url(os.getenv('server_proxy')),
+            #     trust_env=True
+            # )
+            # ApiClient.set_default(api_client)
             self.lighter_client = SignerClient(
                 url=self.lighter_base_url,
                 private_key=api_key_private_key,
@@ -1190,7 +1190,10 @@ class HedgeBot:
 
             if abs(self.edgex_position + self.lighter_position) > self.order_quantity*2:
                 self.logger.error(f"❌ Position diff is too large: {self.edgex_position + self.lighter_position}")
-                break
+                # break
+                await self.emergency_close_all()
+                continue
+
 
             self.order_execution_complete = False
             self.waiting_for_lighter_fill = False
@@ -1207,10 +1210,14 @@ class HedgeBot:
                     self.logger.error(f"⚠️ ValueError in trading loop: {e}")
                     self.logger.error(f"⚠️ Full traceback: {traceback.format_exc()}")
                     # break
+                    await self.emergency_close_all()
+                    continue
             except Exception as e:
                 self.logger.error(f"⚠️ Error in trading loop: {e}")
                 self.logger.error(f"⚠️ Full traceback: {traceback.format_exc()}")
                 # break
+                await self.emergency_close_all()
+                continue
 
             # Wait for edgeX order to fill and then place Lighter order
             start_time = time.time()
@@ -1317,6 +1324,233 @@ class HedgeBot:
             self.logger.info("🔄 Cleaning up...")
             self.shutdown()
 
+    async def emergency_close_all(self):
+        """紧急平仓并关闭全部订单"""
+        try:
+            self.logger.info("🚨 开始执行紧急平仓操作...")
+            
+            # 1. 取消 edgeX 所有活跃订单
+            try:
+                self.logger.info("📋 [edgeX] 正在获取活跃订单...")
+                from edgex_sdk import GetActiveOrderParams
+                params = GetActiveOrderParams(
+                    size="200", 
+                    offset_data="", 
+                    filter_contract_id_list=[self.edgex_contract_id]
+                )
+                active_orders = await self.edgex_client.get_active_orders(params)
+                
+                if active_orders and 'data' in active_orders:
+                    order_list = active_orders['data'].get('dataList', [])
+                    if order_list:
+                        self.logger.info(f"📋 [edgeX] 发现 {len(order_list)} 个活跃订单，正在取消...")
+                        for order in order_list:
+                            if isinstance(order, dict) and order.get('contractId') == self.edgex_contract_id:
+                                order_id = order.get('id')
+                                try:
+                                    cancel_params = CancelOrderParams(order_id=order_id)
+                                    await self.edgex_client.cancel_order(cancel_params)
+                                    self.logger.info(f"✅ [edgeX] 订单 {order_id} 已取消")
+                                except Exception as e:
+                                    self.logger.error(f"❌ [edgeX] 取消订单 {order_id} 失败: {e}")
+                        self.logger.info("✅ [edgeX] 所有订单取消完成")
+                    else:
+                        self.logger.info("✅ [edgeX] 没有活跃订单")
+                else:
+                    self.logger.info("✅ [edgeX] 没有活跃订单")
+            except Exception as e:
+                self.logger.error(f"❌ [edgeX] 取消订单时出错: {e}")
+            
+            # 2. 平掉 edgeX 持仓
+            try:
+                self.logger.info("📊 [edgeX] 正在获取持仓...")
+                positions_data = await self.edgex_client.get_account_positions()
+                
+                if positions_data and 'data' in positions_data:
+                    positions = positions_data.get('data', {}).get('positionList', [])
+                    if positions:
+                        for position in positions:
+                            if isinstance(position, dict) and position.get('contractId') == self.edgex_contract_id:
+                                open_size = Decimal(position.get('openSize', 0))
+                                if abs(open_size) > 0:
+                                    self.logger.info(f"📊 [edgeX] 当前持仓: {open_size}")
+                                    
+                                    # 确定平仓方向
+                                    if open_size > 0:
+                                        # 多头持仓，需要卖出平仓
+                                        side = OrderSide.SELL
+                                        close_side_str = 'sell'
+                                    else:
+                                        # 空头持仓，需要买入平仓
+                                        side = OrderSide.BUY
+                                        close_side_str = 'buy'
+                                    
+                                    # 使用市价单平仓
+                                    try:
+                                        self.edgex_client_order_id = str(int(time.time() * 1000))
+                                        order_result = await self.edgex_client.create_market_order(
+                                            contract_id=self.edgex_contract_id,
+                                            size=str(abs(open_size)),
+                                            side=side,
+                                            client_order_id=self.edgex_client_order_id
+                                        )
+                                        order_id = order_result['data'].get('orderId')
+                                        self.logger.info(f"✅ [edgeX] 平仓订单已提交: {close_side_str} {abs(open_size)}, 订单ID: {order_id}")
+                                        
+                                        # 记录到CSV
+                                        self.log_trade_to_csv(
+                                            exchange='edgeX',
+                                            side=close_side_str,
+                                            price='MARKET',
+                                            quantity=str(abs(open_size))
+                                        )
+                                    except Exception as e:
+                                        self.logger.error(f"❌ [edgeX] 平仓失败: {e}")
+                                else:
+                                    self.logger.info("✅ [edgeX] 当前无持仓")
+                    else:
+                        self.logger.info("✅ [edgeX] 当前无持仓")
+                else:
+                    self.logger.info("✅ [edgeX] 当前无持仓")
+            except Exception as e:
+                self.logger.error(f"❌ [edgeX] 获取持仓或平仓时出错: {e}")
+            
+            # 3. 取消 Lighter 所有活跃订单
+            try:
+                self.logger.info("📋 [Lighter] 正在获取活跃订单...")
+                if not self.lighter_client:
+                    await self.initialize_lighter_client()
+                
+                # 使用 lighter API 获取订单
+                import lighter
+                
+                # 获取账户的所有订单
+                account_api = lighter.AccountApi(self.lighter_client.api_client)
+                account_data = await account_api.account(by="index", value=str(self.account_index))
+                
+                if account_data and account_data.accounts:
+                    orders = account_data.accounts[0].orders
+                    lighter_active_orders = [
+                        order for order in orders 
+                        if order.market_id == self.lighter_market_index 
+                        and order.status.upper() in ['OPEN', 'PENDING']
+                    ]
+                    
+                    if lighter_active_orders:
+                        self.logger.info(f"📋 [Lighter] 发现 {len(lighter_active_orders)} 个活跃订单，正在取消...")
+                        for order in lighter_active_orders:
+                            try:
+                                tx_info, tx_hash, error = await self.lighter_client.cancel_order(
+                                    market_index=self.lighter_market_index,
+                                    order_index=order.order_index
+                                )
+                                if error is None:
+                                    self.logger.info(f"✅ [Lighter] 订单 {order.order_index} 已取消")
+                                else:
+                                    self.logger.error(f"❌ [Lighter] 取消订单 {order.order_index} 失败: {error}")
+                            except Exception as e:
+                                self.logger.error(f"❌ [Lighter] 取消订单失败: {e}")
+                        self.logger.info("✅ [Lighter] 所有订单取消完成")
+                    else:
+                        self.logger.info("✅ [Lighter] 没有活跃订单")
+                else:
+                    self.logger.info("✅ [Lighter] 没有活跃订单")
+            except Exception as e:
+                self.logger.error(f"❌ [Lighter] 取消订单时出错: {e}")
+                self.logger.error(f"❌ [Lighter] 完整错误: {traceback.format_exc()}")
+            
+            # 4. 平掉 Lighter 持仓
+            try:
+                self.logger.info("📊 [Lighter] 正在获取持仓...")
+                if not self.lighter_client:
+                    await self.initialize_lighter_client()
+                
+                import lighter
+                account_api = lighter.AccountApi(self.lighter_client.api_client)
+                account_data = await account_api.account(by="index", value=str(self.account_index))
+                
+                if account_data and account_data.accounts:
+                    positions = account_data.accounts[0].positions
+                    lighter_position = None
+                    for position in positions:
+                        if position.market_id == self.lighter_market_index:
+                            lighter_position = Decimal(position.position)
+                            break
+                    
+                    if lighter_position is None:
+                        lighter_position = Decimal('0')
+                    
+                    if abs(lighter_position) > 0:
+                        self.logger.info(f"📊 [Lighter] 当前持仓: {lighter_position}")
+                        
+                        # 确定平仓方向
+                        if lighter_position > 0:
+                            # 多头持仓，需要卖出平仓
+                            is_ask = True
+                            lighter_side = 'sell'
+                        else:
+                            # 空头持仓，需要买入平仓
+                            is_ask = False
+                            lighter_side = 'buy'
+                        
+                        # 使用市价单平仓
+                        try:
+                            client_order_index = int(time.time() * 1000) % 1000000
+                            
+                            # 获取当前订单簿最优价格作为参考（可选）
+                            # 对于市价单，avg_execution_price 可以传入空字符串或当前最优价格
+                            avg_execution_price = ''
+                            try:
+                                best_bid, best_ask = self.get_lighter_best_levels()
+                                if best_bid and best_ask:
+                                    # 根据平仓方向选择参考价格
+                                    if is_ask:
+                                        # 卖出平仓，使用最优买价作为参考
+                                        avg_execution_price = str(best_bid[0])
+                                    else:
+                                        # 买入平仓，使用最优卖价作为参考
+                                        avg_execution_price = str(best_ask[0])
+                            except Exception as e:
+                                self.logger.warning(f"⚠️ [Lighter] 无法获取最优价格，使用空字符串: {e}")
+                            
+                            created_order, tx_hash, error = await self.lighter_client.create_market_order(
+                                market_index=self.lighter_market_index,
+                                client_order_index=client_order_index,
+                                base_amount=int(abs(lighter_position) * self.base_amount_multiplier),
+                                avg_execution_price=avg_execution_price,
+                                is_ask=is_ask
+                            )
+                            
+                            if error is None:
+                                self.logger.info(f"✅ [Lighter] 平仓订单已提交: {lighter_side} {abs(lighter_position)}, 交易哈希: {tx_hash}")
+                                
+                                # 记录到CSV
+                                self.log_trade_to_csv(
+                                    exchange='Lighter',
+                                    side=lighter_side.upper(),
+                                    price='MARKET',
+                                    quantity=str(abs(lighter_position))
+                                )
+                            else:
+                                self.logger.error(f"❌ [Lighter] 平仓失败: {error}")
+                        except Exception as e:
+                            self.logger.error(f"❌ [Lighter] 平仓失败: {e}")
+                            self.logger.error(f"❌ [Lighter] 完整错误: {traceback.format_exc()}")
+                    else:
+                        self.logger.info("✅ [Lighter] 当前无持仓")
+                else:
+                    self.logger.info("✅ [Lighter] 当前无持仓")
+            except Exception as e:
+                self.logger.error(f"❌ [Lighter] 获取持仓或平仓时出错: {e}")
+                self.logger.error(f"❌ [Lighter] 完整错误: {traceback.format_exc()}")
+            
+            self.logger.info("✅ 紧急平仓操作完成")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"❌ 紧急平仓操作失败: {e}")
+            self.logger.error(f"❌ 完整错误: {traceback.format_exc()}")
+            return False
 
 def parse_arguments():
     """Parse command line arguments."""
