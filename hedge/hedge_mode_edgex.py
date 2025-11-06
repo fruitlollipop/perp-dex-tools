@@ -1511,44 +1511,10 @@ class HedgeBot:
             
             # 3. 取消 Lighter 所有活跃订单
             try:
-                self.logger.info("📋 [Lighter] 正在获取活跃订单...")
+                self.logger.info("📋 [Lighter] 立即所有活跃订单...")
                 if not self.lighter_client:
                     await self.initialize_lighter_client()
-                
-                # 使用 lighter API 获取订单
-                import lighter
-                
-                # 获取账户的所有订单
-                account_api = lighter.AccountApi(self.lighter_client.api_client)
-                account_data = await account_api.account(by="index", value=str(self.account_index))
-                
-                if account_data and account_data.accounts:
-                    orders = account_data.accounts[0].orders
-                    lighter_active_orders = [
-                        order for order in orders 
-                        if order.market_id == self.lighter_market_index 
-                        and order.status.upper() in ['OPEN', 'PENDING']
-                    ]
-                    
-                    if lighter_active_orders:
-                        self.logger.info(f"📋 [Lighter] 发现 {len(lighter_active_orders)} 个活跃订单，正在取消...")
-                        for order in lighter_active_orders:
-                            try:
-                                tx_info, tx_hash, error = await self.lighter_client.cancel_order(
-                                    market_index=self.lighter_market_index,
-                                    order_index=order.order_index
-                                )
-                                if error is None:
-                                    self.logger.info(f"✅ [Lighter] 订单 {order.order_index} 已取消")
-                                else:
-                                    self.logger.error(f"❌ [Lighter] 取消订单 {order.order_index} 失败: {error}")
-                            except Exception as e:
-                                self.logger.error(f"❌ [Lighter] 取消订单失败: {e}")
-                        self.logger.info("✅ [Lighter] 所有订单取消完成")
-                    else:
-                        self.logger.info("✅ [Lighter] 没有活跃订单")
-                else:
-                    self.logger.info("✅ [Lighter] 没有活跃订单")
+                self.lighter_client.sign_cancel_all_orders(0, 0)
             except Exception as e:
                 self.logger.error(f"❌ [Lighter] 取消订单时出错: {e}")
                 self.logger.error(f"❌ [Lighter] 完整错误: {traceback.format_exc()}")
@@ -1600,10 +1566,12 @@ class HedgeBot:
                                     # 根据平仓方向选择参考价格
                                     if is_ask:
                                         # 卖出平仓，使用最优买价作为参考
-                                        avg_execution_price = str(best_bid[0])
+                                        # avg_execution_price = str(best_bid[0])
+                                        avg_execution_price = int(best_bid[0] * self.price_multiplier)
                                     else:
                                         # 买入平仓，使用最优卖价作为参考
-                                        avg_execution_price = str(best_ask[0])
+                                        # avg_execution_price = str(best_ask[0])
+                                        avg_execution_price = int(best_ask[0] * self.price_multiplier)
                             except Exception as e:
                                 self.logger.warning(f"⚠️ [Lighter] 无法获取最优价格，使用空字符串: {e}")
                             
