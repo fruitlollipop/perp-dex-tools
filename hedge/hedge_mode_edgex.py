@@ -11,7 +11,7 @@ import traceback
 import csv
 from decimal import Decimal
 from typing import Dict, Any, Tuple
-
+from tenacity import retry, stop_after_attempt, wait_fixed, retry_if_exception_type
 from lighter.signer_client import SignerClient
 from edgex_sdk import Client, OrderSide, WebSocketManager, CancelOrderParams
 import websockets
@@ -158,12 +158,106 @@ class HedgeBot:
         self.edgex_ws_url = os.getenv('EDGEX_WS_URL', 'wss://quote.edgex.exchange')
 
     def shutdown(self, signum=None, frame=None):
-        """Graceful shutdown handler."""
+        """Graceful shutdown handler (sync version for signal handlers)."""
         self.stop_flag = True
         self.logger.info("\n🛑 Stopping...")
+        
+        # Create async shutdown task if we're in an event loop
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # Schedule async shutdown - the run() method's finally block will also call it
+                # but we set a flag to ensure it happens
+                if not hasattr(self, '_shutdown_initiated'):
+                    self._shutdown_initiated = True
+                    asyncio.create_task(self.async_shutdown())
+            else:
+                # Run async shutdown if loop is not running
+                loop.run_until_complete(self.async_shutdown())
+        except RuntimeError:
+            # No event loop exists, can't run async shutdown
+            self.logger.warning("⚠️ No event loop available for async shutdown")
+            self._sync_shutdown()
 
-        # Close WebSocket connections
-        asyncio.create_task(self.edgex_client.close())
+    async def async_shutdown(self):
+        """Async shutdown handler that performs emergency close and cleanup."""
+        # 防止重复执行
+        if hasattr(self, '_shutdown_completed') and self._shutdown_completed:
+            self.logger.info("⚠️ Shutdown already completed, skipping...")
+            return
+        
+        try:
+            self.logger.info("🚨 执行紧急平仓...")
+            # 1. 先执行紧急平仓
+            await self.emergency_close_all()
+            
+            # 2. 等待一小段时间确保平仓订单已提交
+            await asyncio.sleep(1)
+            
+        except Exception as e:
+            self.logger.error(f"❌ 紧急平仓过程中出错: {e}")
+            self.logger.error(f"❌ 完整错误: {traceback.format_exc()}")
+        finally:
+            # 3. 关闭所有连接
+            await self._close_connections()
+            
+            # 4. 关闭日志处理器
+            self._close_logging_handlers()
+            
+            # 标记为已完成
+            self._shutdown_completed = True
+
+    async def _close_connections(self):
+        """Close all WebSocket and client connections."""
+        # Close edgeX client
+        if self.edgex_client:
+            try:
+                await self.edgex_client.close()
+                self.logger.info("🔌 edgeX client closed")
+            except Exception as e:
+                self.logger.error(f"Error closing edgeX client: {e}")
+
+        # Disconnect edgeX WebSocket connections
+        if self.edgex_ws_manager:
+            try:
+                self.edgex_ws_manager.disconnect_all()
+                self.logger.info("🔌 edgeX WebSocket connections disconnected")
+            except Exception as e:
+                self.logger.error(f"Error disconnecting edgeX WebSocket: {e}")
+
+        # Close Lighter client
+        if self.lighter_client:
+            try:
+                await self.lighter_client.close()
+                self.logger.info("🔌 Lighter client closed")
+            except Exception as e:
+                self.logger.error(f"Error closing Lighter client: {e}")
+
+        # Cancel Lighter WebSocket task
+        if self.lighter_ws_task and not self.lighter_ws_task.done():
+            try:
+                self.lighter_ws_task.cancel()
+                # Wait for task to complete cancellation
+                try:
+                    await self.lighter_ws_task
+                except asyncio.CancelledError:
+                    pass
+                self.logger.info("🔌 Lighter WebSocket task cancelled")
+            except Exception as e:
+                self.logger.error(f"Error cancelling Lighter WebSocket task: {e}")
+
+    def _close_logging_handlers(self):
+        """Close logging handlers properly."""
+        for handler in self.logger.handlers[:]:
+            try:
+                handler.close()
+                self.logger.removeHandler(handler)
+            except Exception:
+                pass
+
+    def _sync_shutdown(self):
+        """Synchronous shutdown fallback when no event loop is available."""
+        # Close WebSocket connections synchronously
         if self.edgex_ws_manager:
             try:
                 self.edgex_ws_manager.disconnect_all()
@@ -172,7 +266,6 @@ class HedgeBot:
                 self.logger.error(f"Error disconnecting edgeX WebSocket: {e}")
 
         # Cancel Lighter WebSocket task
-        asyncio.create_task(self.lighter_client.close())
         if self.lighter_ws_task and not self.lighter_ws_task.done():
             try:
                 self.lighter_ws_task.cancel()
@@ -181,12 +274,7 @@ class HedgeBot:
                 self.logger.error(f"Error cancelling Lighter WebSocket task: {e}")
 
         # Close logging handlers properly
-        for handler in self.logger.handlers[:]:
-            try:
-                handler.close()
-                self.logger.removeHandler(handler)
-            except Exception:
-                pass
+        self._close_logging_handlers()
 
     def _initialize_csv_file(self):
         """Initialize CSV file with headers if it doesn't exist."""
@@ -400,6 +488,12 @@ class HedgeBot:
             return price
         return (price / self.edgex_tick_size).quantize(Decimal('1')) * self.edgex_tick_size
 
+    @retry(
+        stop=stop_after_attempt(5),
+        wait=wait_fixed(3),
+        retry=retry_if_exception_type(ValueError),
+        reraise=True
+    )
     async def place_bbo_order(self, side: str, quantity: Decimal):
         # Get best bid/ask prices
         best_bid, best_ask = await self.fetch_edgex_bbo_prices()
@@ -1322,7 +1416,7 @@ class HedgeBot:
             self.logger.info("\n🛑 Received interrupt signal...")
         finally:
             self.logger.info("🔄 Cleaning up...")
-            self.shutdown()
+            await self.async_shutdown()
 
     async def emergency_close_all(self):
         """紧急平仓并关闭全部订单"""
