@@ -1511,7 +1511,7 @@ class HedgeBot:
             
             # 3. 取消 Lighter 所有活跃订单
             try:
-                self.logger.info("📋 [Lighter] 立即所有活跃订单...")
+                self.logger.info("📋 [Lighter] 立即取消所有活跃订单...")
                 if not self.lighter_client:
                     await self.initialize_lighter_client()
                 self.lighter_client.sign_cancel_all_orders(0, 0)

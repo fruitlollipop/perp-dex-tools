@@ -8,10 +8,12 @@ from typing import Dict, Any, List, Optional, Tuple, Type, Union
 from dataclasses import dataclass
 from decimal import Decimal, ROUND_HALF_UP
 from tenacity import RetryCallState, retry, retry_if_exception_type, stop_after_attempt, wait_exponential
-
+from python_socks.async_.asyncio import Proxy
+from aiohttp_socks import ProxyConnector
+from urllib.parse import urlsplit
 from .base import BaseExchangeClient, OrderResult, OrderInfo, query_retry
 from helpers.logger import TradingLogger
-
+from x10.utils.http import CLIENT_TIMEOUT
 from x10.perpetual.trading_client import PerpetualTradingClient
 from x10.perpetual.configuration import STARKNET_MAINNET_CONFIG
 from x10.perpetual.accounts import StarkPerpetualAccount
@@ -40,8 +42,10 @@ async def _stream_worker(
     extra_headers: dict | list[tuple[str, str]] | None = None,):
     while not stop_event.is_set():
         try:
+            sock = await Proxy.from_url(os.getenv('server_proxy')).connect(urlsplit(url).netloc, 443)
             async with websockets.connect(
-                url, 
+                url,
+                sock=sock,
                 ping_interval=20,
                 ping_timeout=20,
                 extra_headers=extra_headers
@@ -86,6 +90,12 @@ class ExtendedClient(BaseExchangeClient):
         # 按照 trading_client.py 的方式初始化
         self.stark_config = STARKNET_MAINNET_CONFIG
         self.perpetual_trading_client = PerpetualTradingClient(self.stark_config, self.stark_account)
+        proxy_session = aiohttp.ClientSession(connector=ProxyConnector.from_url(os.getenv('server_proxy')), timeout=CLIENT_TIMEOUT)
+        self.perpetual_trading_client._PerpetualTradingClient__info_module._InfoModule__session = proxy_session
+        self.perpetual_trading_client._PerpetualTradingClient__markets_info_module._MarketsInformationModule__session = proxy_session
+        self.perpetual_trading_client._PerpetualTradingClient__account_module._AccountModule__session = proxy_session
+        self.perpetual_trading_client._PerpetualTradingClient__order_management_module._OrderManagementModule__session = proxy_session
+        self.perpetual_trading_client._PerpetualTradingClient__testnet_module._TestnetModule__session = proxy_session
 
         # Initialize logger using the same format as helpers
         self.logger = TradingLogger(exchange="extended", ticker=self.config.ticker, log_to_console=True)
