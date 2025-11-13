@@ -1021,11 +1021,6 @@ class HedgeBot:
                     self.logger.error("❌ Timeout waiting for trade completion")
                     break
 
-            # Sleep after step 2
-            if self.sleep_time > 0:
-                self.logger.info(f"💤 Sleeping {self.sleep_time} seconds after STEP 2...")
-                await asyncio.sleep(self.sleep_time)
-
             # Close remaining position
             self.logger.info(f"[STEP 3] GRVT position: {self.grvt_position} | Lighter position: {self.lighter_position}")
             self.order_execution_complete = False
