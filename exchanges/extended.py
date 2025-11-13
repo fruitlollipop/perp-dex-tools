@@ -91,11 +91,11 @@ class ExtendedClient(BaseExchangeClient):
         self.stark_config = STARKNET_MAINNET_CONFIG
         self.perpetual_trading_client = PerpetualTradingClient(self.stark_config, self.stark_account)
         proxy_session = aiohttp.ClientSession(connector=ProxyConnector.from_url(os.getenv('server_proxy')), timeout=CLIENT_TIMEOUT)
-        self.perpetual_trading_client._PerpetualTradingClient__info_module._InfoModule__session = proxy_session
-        self.perpetual_trading_client._PerpetualTradingClient__markets_info_module._MarketsInformationModule__session = proxy_session
-        self.perpetual_trading_client._PerpetualTradingClient__account_module._AccountModule__session = proxy_session
-        self.perpetual_trading_client._PerpetualTradingClient__order_management_module._OrderManagementModule__session = proxy_session
-        self.perpetual_trading_client._PerpetualTradingClient__testnet_module._TestnetModule__session = proxy_session
+        self.perpetual_trading_client._PerpetualTradingClient__info_module._BaseModule__session = proxy_session
+        self.perpetual_trading_client._PerpetualTradingClient__markets_info_module._BaseModule__session = proxy_session
+        self.perpetual_trading_client._PerpetualTradingClient__account_module._BaseModule__session = proxy_session
+        self.perpetual_trading_client._PerpetualTradingClient__order_management_module._BaseModule__session = proxy_session
+        self.perpetual_trading_client._PerpetualTradingClient__testnet_module._BaseModule__session = proxy_session
 
         # Initialize logger using the same format as helpers
         self.logger = TradingLogger(exchange="extended", ticker=self.config.ticker, log_to_console=True)
