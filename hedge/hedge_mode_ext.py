@@ -1133,17 +1133,6 @@ class HedgeBot:
             self.initialize_lighter_client()
             self.initialize_extended_client()
 
-            from aiohttp_socks import ProxyConnector
-            proxy_connector = ProxyConnector.from_url(
-                os.getenv('server_proxy'),
-                limit=100,
-                limit_per_host=30,
-                keepalive_timeout=30,
-                enable_cleanup_closed=True
-            )
-            await self.extended_client.async_client._ensure_session()
-            await self.extended_client.async_client._session.close()
-            self.extended_client.async_client._session._connector = proxy_connector
             # Get contract info
             self.extended_contract_id, self.extended_tick_size = await self.get_extended_contract_info()
             self.lighter_market_index, self.base_amount_multiplier, self.price_multiplier, self.tick_size = self.get_lighter_market_config()
