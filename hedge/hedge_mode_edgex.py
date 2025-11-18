@@ -873,8 +873,7 @@ class HedgeBot:
                                 elif data.get("type") == "update/account_orders":
                                     # Handle account orders updates
                                     orders = data.get("orders", {}).get(str(self.lighter_market_index), [])
-                                    if len(orders) == 1:
-                                        order_data = orders[0]
+                                    for order_data in orders:
                                         if order_data.get("status") == "filled":
                                             self.handle_lighter_order_result(order_data)
                                 elif data.get("type") == "update/order_book" and not self.lighter_snapshot_loaded:

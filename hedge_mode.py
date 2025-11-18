@@ -56,6 +56,8 @@ Examples:
                         help='Sleep time in seconds after each step (default: 0)')
     parser.add_argument('--env-file', type=str, default=".env",
                         help=".env file path (default: .env)")
+    parser.add_argument('--max-position', type=Decimal, default=Decimal('0'),
+                        help='Maximum position to hold (default: 0)')
     
     return parser.parse_args()
 
@@ -119,14 +121,23 @@ async def main():
     print("-" * 50)
     
     try:
-        # Create the hedge bot instance
-        bot = HedgeBotClass(
-            ticker=args.ticker.upper(),
-            order_quantity=Decimal(args.size),
-            fill_timeout=args.fill_timeout,
-            iterations=args.iter,
-            sleep_time=args.sleep
-        )
+        if args.exchange == 'backpack':
+            bot = HedgeBotClass(
+                ticker=args.ticker.upper(),
+                order_quantity=Decimal(args.size),
+                fill_timeout=args.fill_timeout,
+                iterations=args.iter,
+                sleep_time=args.sleep,
+                max_position=args.max_position
+            )
+        else:
+            bot = HedgeBotClass(
+                ticker=args.ticker.upper(),
+                order_quantity=Decimal(args.size),
+                fill_timeout=args.fill_timeout,
+                iterations=args.iter,
+                sleep_time=args.sleep
+            )
         
         # Run the bot
         await bot.run()
